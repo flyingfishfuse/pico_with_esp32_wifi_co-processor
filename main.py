@@ -3,6 +3,8 @@
 
 import board
 import busio
+from mqtt_manager import MQTTManager
+from config import Config
 from time import sleep
 from machine import Pin
 from digitalio import DigitalInOut
@@ -13,144 +15,8 @@ import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from adafruit_io.adafruit_io import IO_MQTT
 
-
-# MQTT OVERVIEW
-
-#    bidirectional pipeline
-#        subscriber  : retrieves messages
-#        broker      : relays messages
-#        publisher   : sends messages
-#    
-#    raspberry pi pico:
-#        Broker:
-#            of:
-#                - sensor temperature
-#                - sensor humidity
-#            from:
-#                - sensor_esp32 (1 through n)
-#            to:
-#                - internet -> phone
-#                - WLAN -> phone
-#                - display_esp32 (planned)
-#        Publisher:
-#            of: 
-#                - diagnostics
-#            from:
-#                - raspberry pi pico (this)
-#            to:
-#                - WLAN -> phone
-#                - internet -> phone
-#        Subscriber:
-#            of:
-#                -
-#            from:
-#                -
-#            to:
-#                -
-#    ----------------------------------------
-#    ESP32 with attached sensors:
-#        Publisher:
-#            of:
-#                - sensor temperature
-#                - sensor humidity
-#            from:
-#                - attached sensors (1 through n)
-#            to:
-#                - internet -> phone
-#                - WLAN -> phone
-#                - display_esp32 (planned)
-class Config:
-    '''
-    Config class for holding all your secrets and endpoints
-    '''
-    def __init__(self):
-        '''
-        waaat
-        '''
-        self.ssid           = "Untrusted Network"
-        self.password       = 'Whatapassword1!'
-        self.aio_username   = 'your_adafruit_io_username_'
-        self.aio_key        = 'your_big_huge_super_long_aio_key_'
-        self.broker         = 'io.adafruit.com',
-        self.port           = '1883'
-
-class Sensors:
-    '''
-    Possibly unnecessary metaclass for representing the sensors on the esp32
-    '''
-    
-class MQTTManager:
-    def __init__(self,config:Config):
-        '''
-        This class is the handler for all mqtt activities
-
-        It holds the callbacks and the init as well as dial out, dial in
-        '''
-        # do nothing, user must call init themself
-        self.aio_username   = config.aio_username
-        self.aio_passkey    = config.aio_key
-        self.broker         = config.broker
-
-
-    def init_mqtt(self):
-        '''
-        Dials out to adafruit broker
-        '''
-        # Set your Adafruit IO Username and Key in secrets.py
-        # (visit io.adafruit.com if you need to create an account,
-        # or if you need your Adafruit IO key.)
-        aio_username = self.aio_username
-        aio_key = self.aio_passkey
-
-        # original adafruit code stub
-        #print("Connecting to %s" % secrets["ssid"])
-        #wifi.radio.connect(secrets["ssid"], secrets["password"])
-        #print("Connected to %s!" % secrets["ssid"])
-        
-        ### Feeds ###
-
-        # Setup a feed named 'photocell' for publishing to a feed
-        #photocell_feed = self.aio_username + "/feeds/photocell"
-
-        # Setup a feed named 'onoff' for subscribing to changes
-        #onoff_feed = self.aio_username + "/feeds/onoff"
-
-    def create_feeds(self,new_feeds:dict):
-        '''
-        Creates endpoints for publishing and subscribing
-        input:
-            list_of_feeds = [new_endpoint_name_1','new_endpoint_name_2']
-        
-        This will be added as class member via setattr()
-        output:
-            self.new_endpoint_name_1 = "aio_username/feeds/new_endpoint_name_1
-        '''
-        for each in new_feeds:
-            setattr(self,each ,f"{self.aio_username}/feeds/{each}")
-
-    # Define callback methods which are called when events occur
-    # pylint: disable=unused-argument, redefined-outer-name
-    def connected(client, userdata, flags, rc):
-        # This function will be called when the client is connected
-        # successfully to the broker.
-        print("Connected to Adafruit IO! Listening for topic changes on %s" % onoff_feed)
-        # Subscribe to all changes on the onoff_feed.
-        client.subscribe(onoff_feed)
-
-
-    def disconnected(client, userdata, rc):
-        # This method is called when the client is disconnected
-        print("Disconnected from Adafruit IO!")
-
-
-    def message(client, topic, message):
-        # This method is called when a topic the client is subscribed to
-        # has a new message.
-        print("New message on topic {0}: {1}".format(topic, message))
-
-
 class Pico:
-    def __init__(self,config:Config):
+    def __init__(self,config:Config,mqtt_manager:MQTTManager):
         '''
         UNFINISHED
         metaclass to keep pico in scope
@@ -163,6 +29,10 @@ class Pico:
         
             sensor controller  : sensor_esp32_
         '''
+        self.config             = config
+        self.mqtt_manager       = mqtt_manager
+
+    def set_wifi_coprocessor_pins(self):
         self.wifi_esp32_sck    = board.GP10
         self.wifi_esp32_miso   = board.GP12
         self.wifi_esp32_mosi   = board.GP11
@@ -223,19 +93,26 @@ class Pico:
             'key' : 'mqtt_service_key'
         }
         '''
-        self.set_mqtt_secret(mqtt_secret)
+        # old code, refactoring out
+        #self.set_mqtt_secret(mqtt_secret)
         self.mqtt_client = MQTT.MQTT(
-            broker="io.adafruit.com",
-            port=1883,
-            username=self.mqtt_secret["username"],
-            password=self.mqtt_secret["key"],
+            broker=self.mqtt_manager.broker,
+            port=self.mqtt_manager.port,
+            
+            username=self.config.aio_username,
+            password=self.config.aio_key
+
+            # old code, refactoring out
+            #username=self.mqtt_secret["username"],
+            #password=self.mqtt_secret["key"],
         )
         # Initialize an Adafruit IO MQTT Client
-        io = IO_MQTT(mqtt_client)
+        io = IO_MQTT(self.mqtt_client)
 
         # Connect the callback methods defined above to Adafruit IO
-        io.on_connect = connected
-        io.on_disconnect = disconnected
+        io.on_connect = self.mqtt_manager.connected
+        io.on_disconnect = self.mqtt_manager.disconnected
+
         io.on_subscribe = subscribe
 
 class Esp32WifiDevice:
@@ -318,13 +195,16 @@ class Esp32WifiDevice:
         # pico                  = GP12
         #
         # this represents the SPI bus connections between esp32 and pico
-        self.spi            = busio.SPI(pico.wifi_esp32_sck, pico.wifi_esp32_mosi, pico.wifi_esp32_miso)
+        self.spi            = busio.SPI(self.pico.wifi_esp32_sck, 
+                                        self.pico.wifi_esp32_mosi,
+                                        self.pico.wifi_esp32_miso
+                                        )
         #
         #
         #------- CS (clock select) ------------*
         # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5)
         # pico                  = GP13
-        self.esp32_cs           = DigitalInOut(pico.wifi_esp32_cs)
+        self.esp32_cs           = DigitalInOut(self.pico.wifi_esp32_cs)
         #
         #================================
         #   NOTE: in the airlift, BUSY is attached to pin 9 (IO33/A1_5/X32N)
@@ -337,12 +217,12 @@ class Esp32WifiDevice:
         #------- BUSY ------------
         # esp32-S_NINA_firmware = IO33 
         # pico                  = GP14
-        self.esp32_ready    = DigitalInOut(pico.wifi_esp32_ready)
+        self.esp32_ready    = DigitalInOut(self.pico.wifi_esp32_ready)
 
         #------- RST ------------ = GP9
         # esp32-S_NINA_firmware = label:  RESET  | MODULE pin 2
         #                         IC pin: chp_pu | PHYSICAL pin 3
-        self.esp32_reset        = DigitalInOut(pico.wifi_esp32_reset)
+        self.esp32_reset        = DigitalInOut(self.pico.wifi_esp32_reset)
 
         # GP0               = Not needed - used for Bootloading and Blutooth
         # RXI               = Not needed for Wifi - Used for Blutooth 
@@ -403,7 +283,7 @@ class Esp32WifiDevice:
         for ap in self.esp.scan_networks():
             print("\t%s\t\tRSSI: %d" % (str(ap["ssid"], "utf-8"), ap["rssi"]))
 
-    def esp32thing(self):
+    def check_wifi_reset_if_bad(self):#esp32thing(self):
         try:
             s = self.esp.status
             if s == 0:
@@ -450,7 +330,7 @@ class Esp32WifiDevice:
         host_lookpup = self.esp.get_host_by_name(uri)
         self.host_lookup_return = host_lookpup
         print(
-            "[+] IP lookup adafruit.com: %s" % self.esp.pretty_ip(host_lookup)
+            "[+] IP lookup adafruit.com: %s" % self.esp.pretty_ip(self.host_lookup_return)
         )
 
     def ping(self, uri="google.com"):
@@ -490,16 +370,19 @@ if __name__ == "__main__":
 # setup devices
 
     #create config for setting auth and endpoints
-    config = Config()
+    new_config = Config()
     # if your WLAN SSID differs from my test network setup, you might want to change your
     # ssid and password here
     # same with adafruit creds
-    config.ssid = "Other Network"
+    new_config.ssid = "Other Network"
     # but that was just an example, this is going to run on my network so I am going to change the name back!
-    config.ssid = "Untrusted Network"
+    new_config.ssid = "Untrusted Network"
+
+    # create mqtt manager class
+    new_mqtt_manager = MQTTManager
     # create wrapper/reference for main board
     # with configuration
-    pico = Pico(config)
+    pico = Pico(new_config,new_mqtt_manager)
 
     # create new wifi manager class
     esp_device = Esp32WifiDevice(pico)
@@ -523,8 +406,8 @@ if __name__ == "__main__":
     pico.init_mqtt()
     # initialize an mqtt client
     pico.init_mqtt_client({
-        "username":"username",
-        "key":"abc123password321cba"
+        pico.mqtt_manager.aio_username, #"username":"username",
+        pico.mqtt_manager.aio_passkey   #"key":"abc123password321cba"
     })
 
     # test 1
@@ -534,3 +417,9 @@ if __name__ == "__main__":
     # test 23
     # retrieve JSON resource
     esp_device.get_json(esp_device.JSON_URL)
+
+
+    # loop the main operations
+    while True:
+
+        esp_device.check_wifi_reset_if_bad()
