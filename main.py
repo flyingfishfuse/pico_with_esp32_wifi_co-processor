@@ -15,6 +15,9 @@ import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
+###############################################################################
+# REPRESENTATION OF PICO MODULE
+###############################################################################   
 class Pico:
     def __init__(self,config:Config,mqtt_manager:MQTTManager):
         '''
@@ -31,7 +34,9 @@ class Pico:
         '''
         self.config             = config
         self.mqtt_manager       = mqtt_manager
-
+###############################################################################
+# PINOUT
+###############################################################################   
     def set_wifi_coprocessor_pins(self):
         self.wifi_esp32_sck    = board.GP10
         self.wifi_esp32_miso   = board.GP12
@@ -39,7 +44,9 @@ class Pico:
         self.wifi_esp32_cs     = board.GP13
         self.wifi_esp32_ready  = board.GP14
         self.wifi_esp32_reset  = board.GP15
-    
+###############################################################################
+# SPI
+###############################################################################   
     def set_spi(self):
         '''
         UNFINISHED
@@ -60,7 +67,10 @@ class Pico:
         Describes SPI pinout on the pico
         '''
         # Initialize MQTT interface with the esp interface
-   
+
+###############################################################################
+# MQTT operations
+###############################################################################   
     def init_mqtt(self):
         '''
         initializes an mqtt client
@@ -84,8 +94,8 @@ class Pico:
         # defaults to my test network credentials
         else:
             self.mqtt_secret = {
-                'username' : self.config.mqtt_username,
-                'key' : self.config.mqtt_key
+                'mqtt_username' : self.config.mqtt_username,
+                'mqtt_key' : self.config.mqtt_key
                 }
 
     def init_mqtt_client(self):#,mqtt_secret):
@@ -119,6 +129,9 @@ class Pico:
         io.on_disconnect = self.mqtt_manager.disconnected
         io.on_subscribe = self.mqtt_manager.subscribe
 
+###############################################################################
+# REPRESENTATION OF ESP32 WIFI CO-PROCESSOR
+###############################################################################   
 class Esp32WifiDevice:
     def __init__(self, controller:Pico):
         '''
@@ -148,7 +161,9 @@ class Esp32WifiDevice:
                 'ssid' : 'Untrusted Network',
                 'password' : 'Whatapassword1!'
                 }
-
+###############################################################################
+# PINOUT
+###############################################################################   
     def set_pins(self):
         '''
         This pinout requires you are using an ESP32 flashed with adafruit's
@@ -232,6 +247,9 @@ class Esp32WifiDevice:
         # RXI               = Not needed for Wifi - Used for Blutooth 
         # TXO               = Not needed for Wifi - Used for Blutooth
 
+###############################################################################
+# SPI OPERATIONS
+###############################################################################   
     def init_spi(self):
         '''
         Initializes SPI bus operations
@@ -243,6 +261,9 @@ class Esp32WifiDevice:
                                                     self.esp32_reset
                                                     )
 
+###############################################################################
+# WIFI OPERATIONS
+###############################################################################   
     def init_wifi(self):
         '''
         Initializes esp32 wifi managment
@@ -366,7 +387,9 @@ class Esp32WifiDevice:
         print("-" * 40)
         result.close()
 
-
+###############################################################################
+# MAIN LOOP
+###############################################################################   
 if __name__ == "__main__":
 
 # initialization step 1
