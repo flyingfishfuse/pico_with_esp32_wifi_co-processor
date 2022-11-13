@@ -3,17 +3,17 @@
 
 import board
 import busio
-from mqtt_manager import MQTTManager
-from config import Config
 from time import sleep
 from machine import Pin
+from config import Config
 from digitalio import DigitalInOut
+from mqtt_manager import MQTTManager
 import adafruit_requests as requests
+from adafruit_io.adafruit_io import IO_MQTT
 from adafruit_esp32spi import adafruit_esp32spi
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
-import adafruit_minimqtt.adafruit_minimqtt as MQTT
-from adafruit_io.adafruit_io import IO_MQTT
 
 class Pico:
     def __init__(self,config:Config,mqtt_manager:MQTTManager):
@@ -61,29 +61,34 @@ class Pico:
         '''
         # Initialize MQTT interface with the esp interface
    
-    def set_mqtt_secret(self,mqtt_secret:dict):
-        '''
-        Performs auth setup by getting secrets from either
-        supplied parameters or local file
-                defaults to my test network credentials if no parameter given
-        '''
-        # must try to validate auth creds
-        if mqtt_secret is not None and len(mqtt_secret) == 2:
-            self.mqtt_secret = mqtt_secret
-        # defaults to my test network credentials
-        else:
-            self.mqtt_secret = {
-                'username' : '"mqtt_service_username"',
-                'key' : 'mqtt_service_key'
-                }
-
     def init_mqtt(self):
         '''
         initializes an mqtt client
         '''
         MQTT.set_socket(socket, self.esp)
 
-    def init_mqtt_client(self,mqtt_secret):
+    def set_mqtt_secret(self,mqtt_secret:dict):
+        '''
+        Performs auth setup by getting secrets from either
+        supplied parameter or config class
+
+        If mqtt_secret is not supplied as parameter, will use config
+                
+        defaults to my test network credentials if no parameter given
+        '''
+        # must try to validate auth creds a little more
+        if mqtt_secret is not None and len(mqtt_secret) == 2:
+            for each in mqtt_secret:
+                setattr(self,each,mqtt_secret.get(each))
+            #self.mqtt_secret = mqtt_secret
+        # defaults to my test network credentials
+        else:
+            self.mqtt_secret = {
+                'username' : self.config.mqtt_username,
+                'key' : self.config.mqtt_key
+                }
+
+    def init_mqtt_client(self):#,mqtt_secret):
         '''
         Initialize a new MQTT Client object
         must provide authentication credentials as dict
@@ -99,8 +104,8 @@ class Pico:
             broker=self.mqtt_manager.broker,
             port=self.mqtt_manager.port,
             
-            username=self.config.aio_username,
-            password=self.config.aio_key
+            username=self.mqtt_username,
+            password=self.mqtt_key
 
             # old code, refactoring out
             #username=self.mqtt_secret["username"],
@@ -112,8 +117,7 @@ class Pico:
         # Connect the callback methods defined above to Adafruit IO
         io.on_connect = self.mqtt_manager.connected
         io.on_disconnect = self.mqtt_manager.disconnected
-
-        io.on_subscribe = subscribe
+        io.on_subscribe = self.mqtt_manager.subscribe
 
 class Esp32WifiDevice:
     def __init__(self, controller:Pico):
@@ -363,7 +367,6 @@ class Esp32WifiDevice:
         result.close()
 
 
-
 if __name__ == "__main__":
 
 # initialization step 1
@@ -383,6 +386,8 @@ if __name__ == "__main__":
     # create wrapper/reference for main board
     # with configuration
     pico = Pico(new_config,new_mqtt_manager)
+    # initialize the pins used for the wifi co-processor
+    pico.set_wifi_coprocessor_pins()
 
     # create new wifi manager class
     esp_device = Esp32WifiDevice(pico)
@@ -404,11 +409,16 @@ if __name__ == "__main__":
 
     # establish an MQTT connection on the pico
     pico.init_mqtt()
-    # initialize an mqtt client
-    pico.init_mqtt_client({
-        pico.mqtt_manager.aio_username, #"username":"username",
-        pico.mqtt_manager.aio_passkey   #"key":"abc123password321cba"
+    # setup the authorization credentials for mqtt
+    pico.set_mqtt_secret({
+        pico.mqtt_manager.mqtt_username, #"username":"username",
+        pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
     })
+    # initialize an mqtt client
+    pico.init_mqtt_client()#{
+    #    pico.mqtt_manager.mqtt_username, #"username":"username",
+    #    pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
+    #})
 
     # test 1
     # retrieve text resource
