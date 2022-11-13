@@ -10,20 +10,155 @@ import adafruit_requests as requests
 from adafruit_esp32spi import adafruit_esp32spi
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
+from adafruit_io.adafruit_io import IO_MQTT
+
+
+# MQTT OVERVIEW
+
+#    bidirectional pipeline
+#        subscriber  : retrieves messages
+#        broker      : relays messages
+#        publisher   : sends messages
+#    
+#    raspberry pi pico:
+#        Broker:
+#            of:
+#                - sensor temperature
+#                - sensor humidity
+#            from:
+#                - sensor_esp32 (1 through n)
+#            to:
+#                - internet -> phone
+#                - WLAN -> phone
+#                - display_esp32 (planned)
+#        Publisher:
+#            of: 
+#                - diagnostics
+#            from:
+#                - raspberry pi pico (this)
+#            to:
+#                - WLAN -> phone
+#                - internet -> phone
+#        Subscriber:
+#            of:
+#                -
+#            from:
+#                -
+#            to:
+#                -
+#    ----------------------------------------
+#    ESP32 with attached sensors:
+#        Publisher:
+#            of:
+#                - sensor temperature
+#                - sensor humidity
+#            from:
+#                - attached sensors (1 through n)
+#            to:
+#                - internet -> phone
+#                - WLAN -> phone
+#                - display_esp32 (planned)
 
 class Pico:
     def __init__(self):
         '''
-        sets up board info for pico
+        UNFINISHED
+        metaclass to keep pico in scope
+            pretty much a tiny wrapper for "board"
+
+        Defines all pin connections to other modules
+        These modules are to be given descriptive names for readability
+
+            wifi module prefix : wifi_esp32_
+        
+            sensor controller  : sensor_esp32_
         '''
+        self.wifi_esp32_sck    = board.GP10
+        self.wifi_esp32_miso   = board.GP12
+        self.wifi_esp32_mosi   = board.GP11
+        self.wifi_esp32_cs     = board.GP13
+        self.wifi_esp32_ready  = board.GP14
+        self.wifi_esp32_reset  = board.GP15
+    
+    def set_spi(self):
+        '''
+        UNFINISHED
+        sets spi pinout on the pico
+        '''
+        set_of_things = {
+            "sck"   :self.wifi_esp32_sck,
+            "miso"  :self.wifi_esp32_miso,
+            "mosi"  :self.wifi_esp32_mosi,
+            "cs"    :self.wifi_esp32_cs,
+            "ready" :self.wifi_esp32_ready,
+        }
+        
+
+    def get_spi(self):
+        '''
+        UNFINISHED
+        Describes SPI pinout on the pico
+        '''
+        # Initialize MQTT interface with the esp interface
+   
+    def set_mqtt_secret(self,mqtt_secret:dict):
+        '''
+        Performs auth setup by getting secrets from either
+        supplied parameters or local file
+                defaults to my test network credentials if no parameter given
+        '''
+        # must try to validate auth creds
+        if mqtt_secret is not None and len(mqtt_secret) == 2:
+            self.mqtt_secret = mqtt_secret
+        # defaults to my test network credentials
+        else:
+            self.mqtt_secret = {
+                'username' : '"mqtt_service_username"',
+                'key' : 'mqtt_service_key'
+                }
+
+    def init_mqtt(self):
+        '''
+        initializes an mqtt client
+        '''
+        MQTT.set_socket(socket, self.esp)
+
+    def init_mqtt_client(self,mqtt_secret):
+        '''
+        Initialize a new MQTT Client object
+        must provide authentication credentials as dict
+        e.g :
+        {
+            'username' : '"mqtt_service_username"',
+            'key' : 'mqtt_service_key'
+        }
+        '''
+        self.set_mqtt_secret(mqtt_secret)
+        self.mqtt_client = MQTT.MQTT(
+            broker="io.adafruit.com",
+            port=1883,
+            username=self.mqtt_secret["username"],
+            password=self.mqtt_secret["key"],
+        )
+        # Initialize an Adafruit IO MQTT Client
+        io = IO_MQTT(mqtt_client)
+
+        # Connect the callback methods defined above to Adafruit IO
+        io.on_connect = connected
+        io.on_disconnect = disconnected
+        io.on_subscribe = subscribe
 
 class Esp32WifiDevice:
-    def __init__(self):
+    def __init__(self, controller:Pico):
         '''
         '''
+        self.pico = controller
         # slot to store html from a webrequest
         self.requestedpage
         self.ip = self.__ip__()
+        #self.init_spi()
+        #self.init_wifi()
 
     def authentication(self,secrets:dict):
         '''
@@ -46,21 +181,26 @@ class Esp32WifiDevice:
 
     def set_pins(self):
         '''
-        it is necessary to set pins to connections made to other devices
-        and parts of the circuit
+        This pinout requires you are using an ESP32 flashed with adafruit's
+
+            NINA firmware!!!
+        
+        the IOxx numbers indicate which pin you use on the ESP32 module
+        but ONLY if it is NOT an "airlift" module frfom adafruit
+
+        You can find the corresponding pins by looking at the schematic
+        of the esp32 module itself to figure out what IOxx pin on your 
+        chosen esp32 module to use
+
+        The ESP32spi has 12 connections. 
 
         This code was written with a raspberry pi pico as the main controller
         so this code uses the Pico class defined above. You can replace that 
-        with your own class, defininf its own pins
+        with your own class, defining its own pins
 
         This is done so that I can meta my way out of having the file represent
         the board. Treat the class as a pico kind of
         '''
-        # PINOUT FROM PICO TO ESP32
-        #   The ESP32spi has 12 connections. 
-        #   
-        #   This pinout guide requires looking at the module schematics
-        #   to figure out what IOxx pin on your chosen esp32 module to use
         #----------------------------------------------------------------------
         # POWER             |
         # Vin 3.3v-5v / 250ma required for WiFi use. (Pin Position 40)
@@ -71,27 +211,32 @@ class Esp32WifiDevice:
         #       SPI PINOUT
         ###-----------------------------------------------------###
 
-        # (there has been a movment to change miso/mosi naming)
-        # MISO              = Peripheral Out Controller In (PoCi)
-        # MOSI              = Peripheral In Controller Out (PiCo)
+        # (there has been a movement to change miso/mosi naming)
+        # MISO                  = Peripheral Out Controller In (PoCi)
+        # MOSI                  = Peripheral In Controller Out (PiCo)
         #-------------------------------------------------------###
-        #------- SCK -------------
-        # esp32-s_NINA      = IO18 (hiletgo esp32d gpio23)
-        # SCK               = GP10 (pico)
-        #------- MISO ------------
-        # esp32-S_NINA      = IO14 (hiletgo esp32d gpio23)
-        # MISO (POCI) (RX)  = GP12 (pico)
-        #------- MOSI ------------
-        # esp32-S_NINA      = IO23 (hiletgo esp32d gpio23)
-        # MOSI (PICO) (TX)  = GP11 (pico)
-
-        self.spi            = busio.SPI(board.GP10, board.GP11, board.GP12)
+        #
+        #------- SCK -------------*
+        # esp32-S_NINA_firmware = IO18 (hiletgo esp32d gpio18)
+        # pico                  = GP10
+        #
+        #------- MOSI (PICO) (TX) ------------*
+        # esp32-S_NINA_firmware = IO23 (hiletgo esp32d gpio23)
+        # pico                  = GP11
+        #
+        #------- MISO (POCI) (RX) ------------*
+        # esp32-S_NINA_firmware = IO14 (hiletgo esp32d gpio14)
+        # pico                  = GP12
+        #
+        # this represents the SPI bus connections between esp32 and pico
+        self.spi            = busio.SPI(pico.wifi_esp32_sck, pico.wifi_esp32_mosi, pico.wifi_esp32_miso)
         #
         #
-        # CS                = GP13
-        #esp32_cs           = DigitalInOut(board.GP13)
-        self.esp32_cs       = DigitalInOut(board.GP13)
-
+        #------- CS (clock select) ------------*
+        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5)
+        # pico                  = GP13
+        self.esp32_cs           = DigitalInOut(pico.wifi_esp32_cs)
+        #
         #================================
         #   NOTE: in the airlift, BUSY is attached to pin 9 (IO33/A1_5/X32N)
         #   This means that in other modules, if flashed with NINA firmware
@@ -100,30 +245,35 @@ class Esp32WifiDevice:
         #       this is pin33 in the pinout given by hiletgo, meaning GPIO33
         # on other boards, you will need to look at the schematic
         #   
-        # BUSY              = esp32-S IO33 gpio33
-        # esp32-S_NINA      = IO33 
-        # esp32_ready       = DigitalInOut(board.GP8)
-        self.esp32_ready    = DigitalInOut(board.GP14)
+        #------- BUSY ------------
+        # esp32-S_NINA_firmware = IO33 
+        # pico                  = GP14
+        self.esp32_ready    = DigitalInOut(pico.wifi_esp32_ready)
 
-        # RST               = GP9
-        #esp32_reset        = DigitalInOut(board.GP9)
-        self.esp32_reset         = DigitalInOut(board.GP15)
+        #------- RST ------------ = GP9
+        # esp32-S_NINA_firmware = label:  RESET  | MODULE pin 2
+        #                         IC pin: chp_pu | PHYSICAL pin 3
+        self.esp32_reset        = DigitalInOut(pico.wifi_esp32_reset)
 
         # GP0               = Not needed - used for Bootloading and Blutooth
         # RXI               = Not needed for Wifi - Used for Blutooth 
         # TXO               = Not needed for Wifi - Used for Blutooth
 
+    def init_spi(self):
+        '''
+        Initializes SPI bus operations
+        '''
         #ESP32 Setup on Pico:
         self.esp      = adafruit_esp32spi.ESP_SPIcontrol(self.spi, 
                                                     self.esp32_cs, 
                                                     self.esp32_ready, 
                                                     self.esp32_reset
                                                     )
-        self.spi      = busio.SPI(board.GP10, 
-                                  board.GP11, 
-                                  board.GP12
-                                )
 
+    def init_wifi(self):
+        '''
+        Initializes esp32 wifi managment
+        '''
         self.wifi     = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(self.esp, self.secrets)
 
         # establishes a socket resource to be made available for the esp32 data
@@ -176,7 +326,7 @@ class Esp32WifiDevice:
         '''
         Connects to  AP with given credentials
 
-        format of credentials pass as parameter is as follows:
+        format of credentials as parameter is as follows:
         
         secrets = {
             'ssid' : 'Untrusted Network',
@@ -190,61 +340,99 @@ class Esp32WifiDevice:
             except OSError as e:
                 print("could not connect to AP, retrying: ", e)
                 continue
-        print("Connected to", str(self.esp.ssid, "utf-8"), "\tRSSI:", self.esp.rssi)
-        print("My IP address is", self.esp.pretty_ip(self.esp.ip_address))
+        print("[+] Connected to", str(self.esp.ssid, "utf-8"), "\tRSSI:", self.esp.rssi)
+        print("[+] My IP address is", self.esp.pretty_ip(self.esp.ip_address))
 
     def http_request(self,uri="adafruit.com"):
         '''
         Requests a resource via an http request
+        stores return data in 
+            self.http_request_result
         '''
-        self.requestedpage = self.esp.get_host_by_name(uri)
+        print(f"[+ requesting http resource {uri}]")
+        self.http_request_result = self.esp.get_host_by_name(uri)
  
     def get_IP_by_hostname(self,uri="adafruit.com"):
         '''
         obtains IP of given hostname
+        stores return data in 
+            self.host_lookup_return
         '''
+        host_lookpup = self.esp.get_host_by_name(uri)
+        self.host_lookup_return = host_lookpup
         print(
-            "IP lookup adafruit.com: %s" % self.esp.pretty_ip(self.esp.get_host_by_name(uri))
+            "[+] IP lookup adafruit.com: %s" % self.esp.pretty_ip(host_lookup)
         )
 
     def ping(self, uri="google.com"):
         '''
         issues ICMP ping to given resource
         '''
-        print("Ping google.com: %d ms" % self.esp.ping(uri))
+        ping_result = self.esp.ping(uri)
+        print(f"[+] Ping {uri} {ping_result} ms")
 
     def get_text(self, uri):
         '''
 
         '''
-    # self.esp._debug = True
-        print("Fetching text from", uri)
-        r = requests.get(uri)
+        print(f"[+] retreiving text from {uri}")
+        result = requests.get(uri)
         print("-" * 40)
-        print(r.text)
+        print(result.text)
         print("-" * 40)
-        r.close()
+        result.close()
 
     def get_json(self,uri):
         '''
 
         '''
-        print("Fetching json from", uri)
-        r = requests.get(uri)
+        print(f"[+] retreiving json from {uri}")
+        result = requests.get(uri)
         print("-" * 40)
-        print(r.json())
+        print(result.json())
         print("-" * 40)
-        r.close()
+        result.close()
 
 
 
 if __name__ == "__main__":
-    esp_device = Esp32WifiDevice()
+
+# initialization step 1
+# setup devices
+
+    # create wrapper/reference for main board
+    pico = Pico()
+
+    # create new wifi manager class
+    esp_device = Esp32WifiDevice(pico)
+
+    # establish communications between pico and esp32
+    esp_device.init_spi()
+    esp_device.init_wifi()
+
+# initialization step 2
+# connect to network
     # connect
     esp_device.connect_to_AP(esp_device.secrets)
+    
     ## display IP addr
     esp_device.ip()
+
+# initialization step 3
+# establish communications
+
+    # establish an MQTT connection on the pico
+    pico.init_mqtt()
+    # initialize an mqtt client
+    pico.init_mqtt_client({
+        "username":"username",
+        "key":"abc123password321cba"
+    })
+
+    # test 1
     # retrieve text resource
     esp_device.get_text(esp_device.TEXT_URL)
+    
+    # test 23
     # retrieve JSON resource
     esp_device.get_json(esp_device.JSON_URL)
