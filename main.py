@@ -1,19 +1,44 @@
 # SPDX-FileCopyrightText: 2019 ladyada for Adafruit Industries
 # SPDX-License-Identifier: MIT
 
+################################
+# Internal
+################################
 import board
 import busio
 from time import sleep
 from machine import Pin
-from config import Config
 from digitalio import DigitalInOut
+
+################################
+# MQTT
+################################
 from mqtt_manager import MQTTManager
-import adafruit_requests as requests
 from adafruit_io.adafruit_io import IO_MQTT
-from adafruit_esp32spi import adafruit_esp32spi
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
+
+################################
+# communications
+################################
+# spi
+from adafruit_esp32spi import adafruit_esp32spi
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
+# http / sockets
+from adafruit_requests import adafruit_requests as requests
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
+
+################################
+# OLED display
+################################
+import adafruit_displayio_ssd1306
+
+
+################################
+# project imports
+################################
+from config import Config
+
+
 
 ###############################################################################
 # REPRESENTATION OF PICO MODULE
@@ -70,7 +95,7 @@ class Pico:
 
 ###############################################################################
 # MQTT operations
-###############################################################################   
+###############################################################################
     def init_mqtt(self):
         '''
         initializes an mqtt client
@@ -129,6 +154,47 @@ class Pico:
         io.on_disconnect = self.mqtt_manager.disconnected
         io.on_subscribe = self.mqtt_manager.subscribe
 
+
+###############################################################################
+# REPRESENTATION OF ss1306 OLED display
+#   Attached to pico
+###############################################################################   
+class SS1306:
+    def __init__(self):
+        '''
+        This class represents an OLED module I have had for years 
+        now but never really used
+
+        The SS1306, looks neat in low light. Visible in sunlight also.
+        '''
+###############################################################################
+# pinout
+###############################################################################   
+
+    def setpins(self):
+        '''
+        pinout for module to pico via i2c
+        '''
+        #---------------- SDA ----------------*
+        # ss1306 OLED           = SDA 
+        # pico                  = GP18, <I2C1 SDA> , physical pin 24
+        self.i2c_sda = board.GP18
+        #
+        #----------------SCL -----------------*
+        # ss1306 OLED           = SCL 
+        # pico                  = GP19, <I2C1 SCL> , physical pin 25
+        self.i2c_sda = board.GP19
+
+    def init_I2C(self):
+        '''
+        initializes I2C communications between pico and OLED module
+        '''
+        self.i2c = busio.I2C(scl=board.GP5, sda=board.GP4) # This RPi Pico way to call I2C<br>
+
+    def test_print(self):
+        """
+        prints a message in a outline for testing
+        """
 ###############################################################################
 # REPRESENTATION OF ESP32 WIFI CO-PROCESSOR
 ###############################################################################   
@@ -138,7 +204,7 @@ class Esp32WifiDevice:
         '''
         self.pico = controller
         # slot to store html from a webrequest
-        self.requestedpage
+        self.requestedpage = {}
         self.ip = self.__ip__()
         #self.init_spi()
         #self.init_wifi()
@@ -327,13 +393,18 @@ class Esp32WifiDevice:
             'password' : 'Whatapassword1!'
             }
         '''
-        print("Connecting to AP...")
+        print("[+] Connecting to AP...")
         while not self.esp.is_connected:
             try:
-                self.esp.connect_AP(secrets["ssid"], secrets["password"])
+                # ssid and password are in config, config is given to the pico
+                self.esp.connect_AP(
+                                    self.pico.config.ssid,
+                                    self.pico.config.password
+                                    )#secrets["ssid"], secrets["password"])
             except OSError as e:
-                print("could not connect to AP, retrying: ", e)
+                print("[-] Could not connect to AP, retrying: ", e)
                 continue
+        
         print("[+] Connected to", str(self.esp.ssid, "utf-8"), "\tRSSI:", self.esp.rssi)
         print("[+] My IP address is", self.esp.pretty_ip(self.esp.ip_address))
 
@@ -388,6 +459,24 @@ class Esp32WifiDevice:
         result.close()
 
 ###############################################################################
+# operations functions
+###############################################################################
+def init_communications(pico:Pico):
+    # establish an MQTT connection on the pico
+    pico.init_mqtt()
+    
+    # setup the authorization credentials for mqtt
+    pico.set_mqtt_secret({
+        pico.mqtt_manager.mqtt_username, #"username":"username",
+        pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
+    })
+    
+    # initialize an mqtt client
+    pico.init_mqtt_client()#{
+    #    pico.mqtt_manager.mqtt_username, #"username":"username",
+    #    pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
+    #})
+###############################################################################
 # MAIN LOOP
 ###############################################################################   
 if __name__ == "__main__":
@@ -405,7 +494,7 @@ if __name__ == "__main__":
     new_config.ssid = "Untrusted Network"
 
     # create mqtt manager class
-    new_mqtt_manager = MQTTManager
+    new_mqtt_manager = MQTTManager()
     # create wrapper/reference for main board
     # with configuration
     pico = Pico(new_config,new_mqtt_manager)
@@ -427,21 +516,11 @@ if __name__ == "__main__":
     ## display IP addr
     esp_device.ip()
 
+
 # initialization step 3
 # establish communications
-
-    # establish an MQTT connection on the pico
-    pico.init_mqtt()
-    # setup the authorization credentials for mqtt
-    pico.set_mqtt_secret({
-        pico.mqtt_manager.mqtt_username, #"username":"username",
-        pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
-    })
-    # initialize an mqtt client
-    pico.init_mqtt_client()#{
-    #    pico.mqtt_manager.mqtt_username, #"username":"username",
-    #    pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
-    #})
+    
+    init_communications(pico)
 
     # test 1
     # retrieve text resource
@@ -453,6 +532,19 @@ if __name__ == "__main__":
 
 
     # loop the main operations
-    while True:
+        # all you have to do is:
+        # config.debug = False
+    if new_config.debug == True:
+        while True:
+            esp_device.check_wifi_reset_if_bad()
+            esp_device.display_scan_results()
+            esp_device.http_request()
+            print(esp_device.http_request_result)
+            esp_device.get_text()
+            esp_device.get_json()
+            esp_device.get_IP_by_hostname()
 
-        esp_device.check_wifi_reset_if_bad()
+    # not debugging, everything is setup properly
+    elif new_config.debug == False:
+        while True:
+            esp_device.check_wifi_reset_if_bad()
