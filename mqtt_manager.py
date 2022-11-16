@@ -54,33 +54,11 @@ class MQTTManager:
         It holds the callbacks and the init as well as dial out, dial in
         '''
         # do nothing, user must call init themself
-        self.aio_username   = config.aio_username
-        self.aio_passkey    = config.aio_key
-        self.broker         = config.broker
-
-
-    def init_mqtt(self):
-        '''
-        Dials out to adafruit broker
-        '''
-        # Set your Adafruit IO Username and Key in secrets.py
-        # (visit io.adafruit.com if you need to create an account,
-        # or if you need your Adafruit IO key.)
-        aio_username = self.aio_username
-        aio_key = self.aio_passkey
-
-        # original adafruit code stub
-        #print("Connecting to %s" % secrets["ssid"])
-        #wifi.radio.connect(secrets["ssid"], secrets["password"])
-        #print("Connected to %s!" % secrets["ssid"])
-        
-        ### Feeds ###
-
-        # Setup a feed named 'photocell' for publishing to a feed
-        #photocell_feed = self.aio_username + "/feeds/photocell"
-
-        # Setup a feed named 'onoff' for subscribing to changes
-        #onoff_feed = self.aio_username + "/feeds/onoff"
+        self.mqtt_username   = config.mqtt_username
+        self.mqtt_passkey    = config.mqtt_key
+        self.broker          = config.broker
+        self.port            = config.port
+        self.feed_list = {}
 
     def create_feeds(self,new_feeds:dict):
         '''
@@ -90,17 +68,28 @@ class MQTTManager:
         
         This will be added as class member via setattr()
         output:
-            self.new_endpoint_name_1 = "aio_username/feeds/new_endpoint_name_1
+            self.new_endpoint_name_1 = "mqtt_username/feeds/new_endpoint_name_1
         '''
         for each in new_feeds:
-            setattr(self,each ,f"{self.aio_username}/feeds/{each}")
+            # add class member named after feed
+            setattr(self,each ,f"{self.mqtt_username}/feeds/{each}")
+            # put it in a list for tracking and later operations
+            self.feed_list[each] = f"{self.mqtt_username}/feeds/{each}"
+
+    def list_feeds(self):
+        '''
+        returns an itterable for programmatically operating with 
+        individual feeds as one operation
+        '''
+        for feed_item in self.feed_list:
+            print(f"[+] Feed entry: {self.feed_list.get(feed_item)}")
 
     # Define callback methods which are called when events occur
     # pylint: disable=unused-argument, redefined-outer-name
     def connected(client, userdata, flags, rc):
         # This function will be called when the client is connected
         # successfully to the broker.
-        print("Connected to Adafruit IO! Listening for topic changes on %s" % onoff_feed)
+        print(f"Connected to Adafruit IO! Listening for topic changes on {onofffeed}")
         # Subscribe to all changes on the onoff_feed.
         client.subscribe(onoff_feed)
 
@@ -118,4 +107,25 @@ class MQTTManager:
     def subscribe(client, userdata, topic, granted_qos):
         # This method is called when the client subscribes to a new feed.
         print("Subscribed to {0} with QOS level {1}".format(topic, granted_qos))
+
+    #def init_mqtt(self):
+    #    '''
+    #    Dials out to adafruit broker
+    #    '''
+        # Set your Adafruit IO Username and Key in secrets.py (not anymore!)
+        # (visit io.adafruit.com if you need to create an account,
+        # or if you need your Adafruit IO key.)
+
+        # original adafruit code stub
+        #print("Connecting to %s" % secrets["ssid"])
+        #wifi.radio.connect(secrets["ssid"], secrets["password"])
+        #print("Connected to %s!" % secrets["ssid"])
+        
+        ### Feeds ###
+
+        # Setup a feed named 'photocell' for publishing to a feed
+        #photocell_feed = self.mqtt_username + "/feeds/photocell"
+
+        # Setup a feed named 'onoff' for subscribing to changes
+        #onoff_feed = self.mqtt_username + "/feeds/onoff"
 
