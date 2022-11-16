@@ -27,24 +27,24 @@ from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 from adafruit_requests import adafruit_requests as requests
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
-################################
-# OLED display
-################################
-import adafruit_displayio_ssd1306
-
 
 ################################
-# project imports
+# Project imports
+# e.g. module/sensor definitions
 ################################
 from config import Config
-
+from ssd1306_oled import SSD1306
 
 
 ###############################################################################
 # REPRESENTATION OF PICO MODULE
 ###############################################################################   
 class Pico:
-    def __init__(self,config:Config,mqtt_manager:MQTTManager):
+    def __init__(self,
+                 config:Config,
+                 mqtt_manager:MQTTManager,
+                 screen:SSD1306
+                 ):
         '''
         UNFINISHED
         metaclass to keep pico in scope
@@ -59,39 +59,132 @@ class Pico:
         '''
         self.config             = config
         self.mqtt_manager       = mqtt_manager
+        # uncomment if using an OLED screen
+        self.screen             = screen
+
+        #self.spi_pin_set        = {}
 ###############################################################################
 # PINOUT
 ###############################################################################   
     def set_wifi_coprocessor_pins(self):
+        '''
+        This pinout requires you are using an ESP32 flashed with adafruit's
+
+            NINA firmware!!!
+        
+        the IOxx numbers indicate which pin you use on the ESP32 module
+        but ONLY if it is NOT an "airlift" module frfom adafruit
+
+        You can find the corresponding pins by looking at the schematic
+        of the esp32 module itself to figure out what IOxx pin on your 
+        chosen esp32 module to use
+
+        The ESP32spi has 12 connections. 
+
+        This code was written with a raspberry pi pico as the main controller
+        so this code uses the Pico class defined above. You can replace that 
+        with your own class, defining its own pins
+
+        This is done so that I can meta my way out of having the file represent
+        the board. Treat the class as a pico kind of
+        '''
         self.wifi_esp32_sck    = board.GP10
         self.wifi_esp32_miso   = board.GP12
         self.wifi_esp32_mosi   = board.GP11
         self.wifi_esp32_cs     = board.GP13
         self.wifi_esp32_ready  = board.GP14
         self.wifi_esp32_reset  = board.GP15
+
+        #----------------------------------------------------------------------
+        # POWER             |
+        # Vin 3.3v-5v / 250ma required for WiFi use. (Pin Position 40)
+        # 3v Out - upto 50ma for other devices (not used)
+        # GND               | Ground (Pin Position 13)
+        #          
+        ###-----------------------------------------------------###
+        #       SPI PINOUT
+        ###-----------------------------------------------------###
+
+        # (there has been a movement to change miso/mosi naming)
+        # MISO                  = Peripheral Out Controller In (PoCi)
+        # MOSI                  = Peripheral In Controller Out (PiCo)
+        #-------------------------------------------------------###
+        #
+        #------- SCK -------------*
+        # esp32-S_NINA_firmware = IO18 (hiletgo esp32d gpio18)
+        # pico                  = GP10
+        #
+        #------- MOSI (PICO) (TX) ------------*
+        # esp32-S_NINA_firmware = IO23 (hiletgo esp32d gpio23)
+        # pico                  = GP11
+        #
+        #------- MISO (POCI) (RX) ------------*
+        # esp32-S_NINA_firmware = IO14 (hiletgo esp32d gpio14)
+        # pico                  = GP12
+        #
+        # this represents the SPI bus connections between esp32 and pico
+        self.spi            = busio.SPI(self.wifi_esp32_sck, 
+                                        self.wifi_esp32_mosi,
+                                        self.wifi_esp32_miso
+                                        )
+        #
+        #
+        #------- CS (clock select) ------------*
+        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5)
+        # pico                  = GP13
+        self.esp32_cs           = DigitalInOut(self.wifi_esp32_cs)
+        #
+        #================================
+        #   NOTE: in the airlift, BUSY is attached to pin 9 (IO33/A1_5/X32N)
+        #   This means that in other modules, if flashed with NINA firmware
+        #   BUSY will be on IO33
+        #       on hiletgo wroom-esp32S (mislabeled as esp-wroom-32-d)
+        #       this is pin33 in the pinout given by hiletgo, meaning GPIO33
+        # on other boards, you will need to look at the schematic
+        #   
+        #------- BUSY ------------
+        # esp32-S_NINA_firmware = IO33 
+        # pico                  = GP14
+        self.esp32_ready    = DigitalInOut(self.wifi_esp32_ready)
+
+        #------- RST ------------ = GP9
+        # esp32-S_NINA_firmware = label:  RESET  | MODULE pin 2
+        #                         IC pin: chp_pu | PHYSICAL pin 3
+        self.esp32_reset        = DigitalInOut(self.wifi_esp32_reset)
+
+        # GP0               = Not needed - used for Bootloading and Blutooth
+        # RXI               = Not needed for Wifi - Used for Blutooth 
+        # TXO               = Not needed for Wifi - Used for Blutooth
+
 ###############################################################################
 # SPI
-###############################################################################   
-    def set_spi(self):
+###############################################################################
+    def init_spi(self):
         '''
-        UNFINISHED
-        sets spi pinout on the pico
+        Initializes SPI bus operations
+        '''
+        #ESP32 Setup on Pico:
+        self.esp_spi_bus      = adafruit_esp32spi.ESP_SPIcontrol(self.spi, 
+                                                    self.esp32_cs, 
+                                                    self.esp32_ready, 
+                                                    self.esp32_reset
+                                                    )
+
+    def get_spi_pins(self)->dict :
+        '''
+        UNFINISHED, possibly unneeded
+        returns dict of spi pinout on the pico
+
+        be sure to label these properly, dont get confused like me
         '''
         set_of_things = {
-            "sck"   :self.wifi_esp32_sck,
-            "miso"  :self.wifi_esp32_miso,
-            "mosi"  :self.wifi_esp32_mosi,
-            "cs"    :self.wifi_esp32_cs,
-            "ready" :self.wifi_esp32_ready,
+            "wifi_esp32_sck"   :self.wifi_esp32_sck,
+            "wifi_esp32_miso"  :self.wifi_esp32_miso,
+            "wifi_esp32_mosi"  :self.wifi_esp32_mosi,
+            "wifi_esp32_cs"    :self.wifi_esp32_cs,
+            "wifi_esp32_ready" :self.wifi_esp32_ready,
         }
-        
-
-    def get_spi(self):
-        '''
-        UNFINISHED
-        Describes SPI pinout on the pico
-        '''
-        # Initialize MQTT interface with the esp interface
+        return set_of_things
 
 ###############################################################################
 # MQTT operations
@@ -154,55 +247,28 @@ class Pico:
         io.on_disconnect = self.mqtt_manager.disconnected
         io.on_subscribe = self.mqtt_manager.subscribe
 
-
-###############################################################################
-# REPRESENTATION OF ss1306 OLED display
-#   Attached to pico
-###############################################################################   
-class SS1306:
-    def __init__(self):
-        '''
-        This class represents an OLED module I have had for years 
-        now but never really used
-
-        The SS1306, looks neat in low light. Visible in sunlight also.
-        '''
-###############################################################################
-# pinout
-###############################################################################   
-
-    def setpins(self):
-        '''
-        pinout for module to pico via i2c
-        '''
-        #---------------- SDA ----------------*
-        # ss1306 OLED           = SDA 
-        # pico                  = GP18, <I2C1 SDA> , physical pin 24
-        self.i2c_sda = board.GP18
-        #
-        #----------------SCL -----------------*
-        # ss1306 OLED           = SCL 
-        # pico                  = GP19, <I2C1 SCL> , physical pin 25
-        self.i2c_sda = board.GP19
-
-    def init_I2C(self):
-        '''
-        initializes I2C communications between pico and OLED module
-        '''
-        self.i2c = busio.I2C(scl=board.GP5, sda=board.GP4) # This RPi Pico way to call I2C<br>
-
-    def test_print(self):
-        """
-        prints a message in a outline for testing
-        """
 ###############################################################################
 # REPRESENTATION OF ESP32 WIFI CO-PROCESSOR
+#
+#   This is a class representing an esp32 module
+#   TODO: type up background and specs
+#
+#
 ###############################################################################   
 class Esp32WifiDevice:
-    def __init__(self, controller:Pico):
+    def __init__(self,spi_bus):#spi_pin_set:dict):#, controller:Pico):
         '''
+        pass this class the spi bus created on the pico
+        pico.esp_spi_bus
         '''
-        self.pico = controller
+
+        # pass the pins from the pico that you are using for spi
+        # get these pins with Pico.get_spi_pins
+        #self.spi_pin_set = spi_pin_set
+        #self.pico = controller
+
+        # spi bus connection from pico
+        self.spi_bus = spi_bus
         # slot to store html from a webrequest
         self.requestedpage = {}
         self.ip = self.__ip__()
@@ -227,105 +293,6 @@ class Esp32WifiDevice:
                 'ssid' : 'Untrusted Network',
                 'password' : 'Whatapassword1!'
                 }
-###############################################################################
-# PINOUT
-###############################################################################   
-    def set_pins(self):
-        '''
-        This pinout requires you are using an ESP32 flashed with adafruit's
-
-            NINA firmware!!!
-        
-        the IOxx numbers indicate which pin you use on the ESP32 module
-        but ONLY if it is NOT an "airlift" module frfom adafruit
-
-        You can find the corresponding pins by looking at the schematic
-        of the esp32 module itself to figure out what IOxx pin on your 
-        chosen esp32 module to use
-
-        The ESP32spi has 12 connections. 
-
-        This code was written with a raspberry pi pico as the main controller
-        so this code uses the Pico class defined above. You can replace that 
-        with your own class, defining its own pins
-
-        This is done so that I can meta my way out of having the file represent
-        the board. Treat the class as a pico kind of
-        '''
-        #----------------------------------------------------------------------
-        # POWER             |
-        # Vin 3.3v-5v / 250ma required for WiFi use. (Pin Position 40)
-        # 3v Out - upto 50ma for other devices (not used)
-        # GND               | Ground (Pin Position 13)
-        #          
-        ###-----------------------------------------------------###
-        #       SPI PINOUT
-        ###-----------------------------------------------------###
-
-        # (there has been a movement to change miso/mosi naming)
-        # MISO                  = Peripheral Out Controller In (PoCi)
-        # MOSI                  = Peripheral In Controller Out (PiCo)
-        #-------------------------------------------------------###
-        #
-        #------- SCK -------------*
-        # esp32-S_NINA_firmware = IO18 (hiletgo esp32d gpio18)
-        # pico                  = GP10
-        #
-        #------- MOSI (PICO) (TX) ------------*
-        # esp32-S_NINA_firmware = IO23 (hiletgo esp32d gpio23)
-        # pico                  = GP11
-        #
-        #------- MISO (POCI) (RX) ------------*
-        # esp32-S_NINA_firmware = IO14 (hiletgo esp32d gpio14)
-        # pico                  = GP12
-        #
-        # this represents the SPI bus connections between esp32 and pico
-        self.spi            = busio.SPI(self.pico.wifi_esp32_sck, 
-                                        self.pico.wifi_esp32_mosi,
-                                        self.pico.wifi_esp32_miso
-                                        )
-        #
-        #
-        #------- CS (clock select) ------------*
-        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5)
-        # pico                  = GP13
-        self.esp32_cs           = DigitalInOut(self.pico.wifi_esp32_cs)
-        #
-        #================================
-        #   NOTE: in the airlift, BUSY is attached to pin 9 (IO33/A1_5/X32N)
-        #   This means that in other modules, if flashed with NINA firmware
-        #   BUSY will be on IO33
-        #       on hiletgo wroom-esp32S (mislabeled as esp-wroom-32-d)
-        #       this is pin33 in the pinout given by hiletgo, meaning GPIO33
-        # on other boards, you will need to look at the schematic
-        #   
-        #------- BUSY ------------
-        # esp32-S_NINA_firmware = IO33 
-        # pico                  = GP14
-        self.esp32_ready    = DigitalInOut(self.pico.wifi_esp32_ready)
-
-        #------- RST ------------ = GP9
-        # esp32-S_NINA_firmware = label:  RESET  | MODULE pin 2
-        #                         IC pin: chp_pu | PHYSICAL pin 3
-        self.esp32_reset        = DigitalInOut(self.pico.wifi_esp32_reset)
-
-        # GP0               = Not needed - used for Bootloading and Blutooth
-        # RXI               = Not needed for Wifi - Used for Blutooth 
-        # TXO               = Not needed for Wifi - Used for Blutooth
-
-###############################################################################
-# SPI OPERATIONS
-###############################################################################   
-    def init_spi(self):
-        '''
-        Initializes SPI bus operations
-        '''
-        #ESP32 Setup on Pico:
-        self.esp      = adafruit_esp32spi.ESP_SPIcontrol(self.spi, 
-                                                    self.esp32_cs, 
-                                                    self.esp32_ready, 
-                                                    self.esp32_reset
-                                                    )
 
 ###############################################################################
 # WIFI OPERATIONS
@@ -493,16 +460,26 @@ if __name__ == "__main__":
     # but that was just an example, this is going to run on my network so I am going to change the name back!
     new_config.ssid = "Untrusted Network"
 
+    # create new screen manager
+    new_screen = SSD1306()
+
+    # create new wifi manager
+    #new_wifi_manager = Esp32WifiDevice()
     # create mqtt manager class
     new_mqtt_manager = MQTTManager()
     # create wrapper/reference for main board
-    # with configuration
-    pico = Pico(new_config,new_mqtt_manager)
+    # with configuration, mqtt, and screen managers
+    pico = Pico(new_config,
+                new_mqtt_manager,
+                new_screen,
+                #new_wifi_manager
+                )
     # initialize the pins used for the wifi co-processor
     pico.set_wifi_coprocessor_pins()
 
-    # create new wifi manager class
-    esp_device = Esp32WifiDevice(pico)
+    # create new wifi manager class, passing it the 
+    # spi bus connection for bidirectional comms
+    esp_device = Esp32WifiDevice(pico.esp_spi_bus)
 
     # establish communications between pico and esp32
     esp_device.init_spi()
