@@ -12,13 +12,15 @@ import terminalio
 import adafruit_displayio_ssd1306
 from adafruit_display_text import label
 
+from config import Config
+
 
 ###############################################################################
 # REPRESENTATION OF ss1306 OLED display
 #   Attached to pico
 ###############################################################################   
 class SSD1306:
-    def __init__(self):
+    def __init__(self,config:Config):
         '''
         This class represents an OLED module I have had for years 
         now but never really used
@@ -27,7 +29,9 @@ class SSD1306:
         '''
         # i2c device address, can change, double check this
         #128 x 64 size OLEDs
-        self.device_address = 0x3d
+        #self.device_address = 0x3d
+        self.device_address = config.oled_i2c_addr
+
         #128x32
         #self.device_address=0x3c
 
@@ -39,6 +43,11 @@ class SSD1306:
         self.WIDTH = 128
         self.WIDTH = 64
         self.BORDER = 5
+
+        self.WIDTH = config.WIDTH
+        self.WIDTH = config.HEIGHT
+        self.BORDER = config.BORDER
+
 
         self.CENTER_X = int(self.WIDTH/2)
         self.CENTER_Y = int(self.WIDTH/2)
@@ -99,12 +108,14 @@ class SSD1306:
         #---------------- SDA ----------------*
         # ss1306 OLED           = SDA 
         # pico                  = GP18, <I2C1 SDA> , physical pin 24
-        self.i2c_sda = board.GP18
+        self.i2c_sda            = board.GP18
+        #self.i2c_sda = config.oled_i2c_sda
         #
         #----------------SCL -----------------*
         # ss1306 OLED           = SCL 
         # pico                  = GP19, <I2C1 SCL> , physical pin 25
-        self.i2c_sda = board.GP19
+        self.i2c_scl            = board.GP19
+        #self.i2c_scl = config.oled_i2c_scl
         #--------------Reset ----------------*
         # ss1306 OLED           = RES
         # pico                  = GP09 I guess? Adafruit, fix your tutorials
@@ -114,7 +125,7 @@ class SSD1306:
         '''
         initializes I2C communications between pico and OLED module
         '''
-        self.i2c = busio.I2C(scl=board.GP5, sda=board.GP4) # This RPi Pico way to call I2C<br>
+        self.i2c_bus = busio.I2C(scl=self.i2c_scl, sda=self.i2c_sda)
 
     def test_picture(self):
         """
