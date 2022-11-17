@@ -1,53 +1,21 @@
+################################
+# MQTT
+################################
+from mqtt_manager import MQTTManager
+from adafruit_io.adafruit_io import IO_MQTT
+import adafruit_minimqtt.adafruit_minimqtt as MQTT
+
+import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
 from config import Config
-# MQTT OVERVIEW
 
-#    bidirectional pipeline
-#        subscriber  : retrieves messages
-#        broker      : relays messages
-#        publisher   : sends messages
-#    
-#    raspberry pi pico:
-#        Broker:
-#            of:
-#                - sensor temperature
-#                - sensor humidity
-#            from:
-#                - sensor_esp32 (1 through n)
-#            to:
-#                - internet -> phone
-#                - WLAN -> phone
-#                - display_esp32 (planned)
-#        Publisher:
-#            of: 
-#                - diagnostics
-#            from:
-#                - raspberry pi pico (this)
-#            to:
-#                - WLAN -> phone
-#                - internet -> phone
-#        Subscriber:
-#            of:
-#                -
-#            from:
-#                -
-#            to:
-#                -
-#    ----------------------------------------
-#    ESP32 with attached sensors:
-#        Publisher:
-#            of:
-#                - sensor temperature
-#                - sensor humidity
-#            from:
-#                - attached sensors (1 through n)
-#            to:
-#                - internet -> phone
-#                - WLAN -> phone
-#                - display_esp32 (planned)
 
 class MQTTManager:
-    def __init__(self,config:Config):
+    def __init__(self,
+                 config:Config,
+                 #i2c_bus
+                 #mqtt_secret:dict
+                 ):
         '''
         This class is the handler for all mqtt activities
 
@@ -59,6 +27,73 @@ class MQTTManager:
         self.broker          = config.broker
         self.port            = config.port
         self.feed_list = {}
+
+        #self.mqtt_secret = config.mqtt_secret
+        self.set_mqtt_secret(config.mqtt_auth_creds)
+
+        # establish an MQTT connection on the pico
+        self.init_mqtt()
+    
+        # initialize an mqtt client
+        self.init_mqtt_client()
+###############################################################################
+# MQTT operations
+###############################################################################
+    def init_mqtt(self):
+        '''
+        initializes an mqtt socket
+        '''
+        MQTT.set_socket(socket, self.esp_spi_bus)
+
+    def set_mqtt_secret(self,mqtt_secret:dict):
+        '''
+        just for testing currently, dont try to reset the creds via any method or it will fail
+        Performs auth setup by getting secrets from either
+        supplied parameter or config class
+
+        If mqtt_secret is not supplied as parameter, will use config
+                
+        defaults to my test network credentials if no parameter given
+
+        BIG TODO: refactor this function, I got brainulated and skipped 
+        doing the thing to the thing for the things with the thingamabooble
+        '''
+        # must try to validate auth creds a little more
+        if len(mqtt_secret) == 2 and isinstance(mqtt_secret, dict):
+            for each in mqtt_secret:
+                setattr(self,each,mqtt_secret.get(each))
+            self.mqtt_secret = {
+                                'username': self.mqtt_username,
+                                'key'     : self.mqtt_passkey
+                                }
+
+            #self.mqtt_secret = mqtt_secret
+        # defaults to my test network credentials
+        else:
+            print("[-] Bad data given, falling back to original from config")
+
+            self.mqtt_secret = {
+                                'username': self.mqtt_username,
+                                'key'     : self.mqtt_passkey
+                                }
+
+    def init_mqtt_client(self):#,mqtt_secret):
+        '''
+        Initialize a new MQTT Client object
+        '''
+        self.mqtt_client = MQTT.MQTT(
+                                     broker=self.broker,
+                                     port=self.port,
+                                     username=self.mqtt_username,
+                                     password=self.mqtt_passkey
+                                    )
+        # Initialize an Adafruit IO MQTT Client
+        io = IO_MQTT(self.mqtt_client)
+
+        # Connect the callback methods defined above to Adafruit IO
+        io.on_connect = self.connected
+        io.on_disconnect = self.disconnected
+        io.on_subscribe = self.subscribe
 
     def create_feeds(self,new_feeds:dict):
         '''
@@ -84,6 +119,37 @@ class MQTTManager:
         for feed_item in self.feed_list:
             print(f"[+] Feed entry: {self.feed_list.get(feed_item)}")
 
+
+
+    #def init_mqtt(self):
+    #    '''
+    #    Dials out to adafruit broker
+    #    '''
+        # Set your Adafruit IO Username and Key in secrets.py (not anymore!)
+        # (visit io.adafruit.com if you need to create an account,
+        # or if you need your Adafruit IO key.)
+
+        # original adafruit code stub
+        #print("Connecting to %s" % secrets["ssid"])
+        #wifi.radio.connect(secrets["ssid"], secrets["password"])
+        #print("Connected to %s!" % secrets["ssid"])
+        
+        ### Feeds ###
+
+        # Setup a feed named 'photocell' for publishing to a feed
+        #photocell_feed = self.mqtt_username + "/feeds/photocell"
+
+        # Setup a feed named 'onoff' for subscribing to changes
+        #onoff_feed = self.mqtt_username + "/feeds/onoff"
+
+    #def create_callback(self, new_callback:function)-> Callback:
+        # Initialize an Adafruit IO MQTT Client
+        io = IO_MQTT(self.mqtt_client)
+
+        # Connect the callback methods defined above to Adafruit IO
+        io.on_connect = self.connected
+        io.on_disconnect = self.disconnected
+        io.on_subscribe = self.subscribe
     # Define callback methods which are called when events occur
     # pylint: disable=unused-argument, redefined-outer-name
     def connected(client, userdata, flags, rc):
@@ -108,24 +174,8 @@ class MQTTManager:
         # This method is called when the client subscribes to a new feed.
         print("Subscribed to {0} with QOS level {1}".format(topic, granted_qos))
 
-    #def init_mqtt(self):
-    #    '''
-    #    Dials out to adafruit broker
-    #    '''
-        # Set your Adafruit IO Username and Key in secrets.py (not anymore!)
-        # (visit io.adafruit.com if you need to create an account,
-        # or if you need your Adafruit IO key.)
-
-        # original adafruit code stub
-        #print("Connecting to %s" % secrets["ssid"])
-        #wifi.radio.connect(secrets["ssid"], secrets["password"])
-        #print("Connected to %s!" % secrets["ssid"])
-        
-        ### Feeds ###
-
-        # Setup a feed named 'photocell' for publishing to a feed
-        #photocell_feed = self.mqtt_username + "/feeds/photocell"
-
-        # Setup a feed named 'onoff' for subscribing to changes
-        #onoff_feed = self.mqtt_username + "/feeds/onoff"
-
+class Callback:
+    def __cls__(cls,new_function:function):
+        '''
+        creates a new callback for Adafruit.IO MQTT
+        '''
