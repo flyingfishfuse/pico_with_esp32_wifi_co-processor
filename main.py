@@ -19,25 +19,7 @@ from ssd1306_oled import SSD1306
 from mqtt_manager import MQTTManager
 from esp32_wifi_coprocessor import Esp32WifiDevice
 
-
-###############################################################################
-# operations functions
-###############################################################################
-def init_communications(pico:Pico):
-    # establish an MQTT connection on the pico
-    pico.init_mqtt()
-    
-    # setup the authorization credentials for mqtt
-    pico.set_mqtt_secret({
-        pico.mqtt_manager.mqtt_username, #"username":"username",
-        pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
-    })
-    
-    # initialize an mqtt client
-    pico.init_mqtt_client()#{
-    #    pico.mqtt_manager.mqtt_username, #"username":"username",
-    #    pico.mqtt_manager.mqtt_passkey   #"key":"abc123password321cba"
-    #})
+from .secrets import ssid,password,adafruit_io_username,adafruit_io_api_key
 ###############################################################################
 # MAIN LOOP
 ###############################################################################   
@@ -47,7 +29,12 @@ if __name__ == "__main__":
 # setup devices
 
     #create config for setting auth and endpoints
-    new_config = Config()
+    new_config = Config(
+                        ssid,
+                        password,
+                        adafruit_io_username,
+                        adafruit_io_api_key
+                        )
     # if your WLAN SSID differs from my test network setup, you might want to change your
     # ssid and password here
     # same with adafruit creds
@@ -56,14 +43,13 @@ if __name__ == "__main__":
     new_config.ssid = "Untrusted Network"
 
     # create new screen manager
-    # TODO: add config params to SSD1306().__init__
-    new_screen = SSD1306()
+    # pass configuration for configuration
+    new_screen = SSD1306(new_config)
 
-    # create new wifi manager
-    #new_wifi_manager = Esp32WifiDevice()
     # create mqtt manager class
     # pass it the config so it knows whats up
     new_mqtt_manager = MQTTManager(new_config)
+
     # create wrapper/reference for main board
     # with configuration, mqtt, and screen managers
     pico = Pico(new_config,
@@ -73,10 +59,13 @@ if __name__ == "__main__":
     # initialize the pins used for the wifi co-processor
     pico.set_wifi_coprocessor_pins()
 
+    # make reference to esp spi bus
+    esp_spi_bus = pico.esp_spi_bus
+
     # create new wifi manager class, passing it the 
     # spi bus connection for bidirectional comms
     # and the config for configuration
-    esp_device = Esp32WifiDevice(pico.esp_spi_bus,new_config)
+    esp_device = Esp32WifiDevice(esp_spi_bus,new_config)
 
     # establish communications between pico and esp32
     esp_device.init_spi()
@@ -94,7 +83,7 @@ if __name__ == "__main__":
 # initialization step 3
 # establish communications
     
-    init_communications(pico)
+    #init_mqtt(pico)
 
     # test 1
     # retrieve text resource
