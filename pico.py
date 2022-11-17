@@ -11,13 +11,6 @@ from machine import Pin
 from digitalio import DigitalInOut
 
 ################################
-# MQTT
-################################
-from mqtt_manager import MQTTManager
-from adafruit_io.adafruit_io import IO_MQTT
-import adafruit_minimqtt.adafruit_minimqtt as MQTT
-
-################################
 # communications
 ################################
 # spi
@@ -34,6 +27,7 @@ import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 ################################
 from config import Config
 from ssd1306_oled import SSD1306
+from mqtt_manager import MQTTManager
 
 
 ###############################################################################
@@ -170,79 +164,23 @@ class Pico:
                                                     self.esp32_reset
                                                     )
 
-    def get_spi_pins(self)->dict :
-        '''
-        UNFINISHED, possibly unneeded
-        returns dict of spi pinout on the pico
-
-        be sure to label these properly, dont get confused like me
-        '''
-        set_of_things = {
-            "wifi_esp32_sck"   :self.wifi_esp32_sck,
-            "wifi_esp32_miso"  :self.wifi_esp32_miso,
-            "wifi_esp32_mosi"  :self.wifi_esp32_mosi,
-            "wifi_esp32_cs"    :self.wifi_esp32_cs,
-            "wifi_esp32_ready" :self.wifi_esp32_ready,
-        }
-        return set_of_things
 
 ###############################################################################
-# MQTT operations
+# old code
 ###############################################################################
-    def init_mqtt(self):
-        '''
-        initializes an mqtt client
-        '''
-        MQTT.set_socket(socket, self.esp)
 
-    def set_mqtt_secret(self,mqtt_secret:dict):
-        '''
-        Performs auth setup by getting secrets from either
-        supplied parameter or config class
-
-        If mqtt_secret is not supplied as parameter, will use config
-                
-        defaults to my test network credentials if no parameter given
-        '''
-        # must try to validate auth creds a little more
-        if mqtt_secret is not None and len(mqtt_secret) == 2:
-            for each in mqtt_secret:
-                setattr(self,each,mqtt_secret.get(each))
-            #self.mqtt_secret = mqtt_secret
-        # defaults to my test network credentials
-        else:
-            self.mqtt_secret = {
-                'mqtt_username' : self.config.mqtt_username,
-                'mqtt_key' : self.config.mqtt_key
-                }
-
-    def init_mqtt_client(self):#,mqtt_secret):
-        '''
-        Initialize a new MQTT Client object
-        must provide authentication credentials as dict
-        e.g :
-        {
-            'username' : '"mqtt_service_username"',
-            'key' : 'mqtt_service_key'
-        }
-        '''
-        # old code, refactoring out
-        #self.set_mqtt_secret(mqtt_secret)
-        self.mqtt_client = MQTT.MQTT(
-            broker=self.mqtt_manager.broker,
-            port=self.mqtt_manager.port,
-            
-            username=self.mqtt_username,
-            password=self.mqtt_key
-
-            # old code, refactoring out
-            #username=self.mqtt_secret["username"],
-            #password=self.mqtt_secret["key"],
-        )
-        # Initialize an Adafruit IO MQTT Client
-        io = IO_MQTT(self.mqtt_client)
-
-        # Connect the callback methods defined above to Adafruit IO
-        io.on_connect = self.mqtt_manager.connected
-        io.on_disconnect = self.mqtt_manager.disconnected
-        io.on_subscribe = self.mqtt_manager.subscribe
+    #def get_spi_pins(self)->dict :
+    #    '''
+    #    UNFINISHED, possibly unneeded
+    #    returns dict of spi pinout on the pico
+    #
+    #    be sure to label these properly, dont get confused like me
+    #    '''
+        #set_of_things = {
+        #    "wifi_esp32_sck"   :self.wifi_esp32_sck,
+        #    "wifi_esp32_miso"  :self.wifi_esp32_miso,
+        #    "wifi_esp32_mosi"  :self.wifi_esp32_mosi,
+        #    "wifi_esp32_cs"    :self.wifi_esp32_cs,
+        #    "wifi_esp32_ready" :self.wifi_esp32_ready,
+        #}
+        #return set_of_things
