@@ -1,25 +1,36 @@
-import board
 
 class Config:
     '''
     Config class for holding all your secrets and endpoints
     '''
-    def __init__(self):
+    def __init__(self,
+                 ssid,
+                 password,
+                 api_username,
+                 api_key,):
         '''
         waaat
         '''
         self.debug          =  True
-        self.ssid           = "Untrusted Network"
-        self.password       = 'Whatapassword1!'
+        self.ssid           = ssid
+        self.password       = password
         # the name is important, read the code in:
         #   Pico.set_mqtt_secret()
         # and
         #   Pico.init_mqtt_client()
         # do not change names, these items are for specific activities
-        self.mqtt_username   = 'your_adafruit_io_username_'
-        self.mqtt_key        = 'your_big_huge_super_long_aio_key_'
+        self.mqtt_username   = api_username
+        self.mqtt_key        = api_key
+        
+        # just to make a single entity with both, I know its redundant
+        # but it makes it cleaner later
+        self.mqtt_auth_creds = {
+                                "username": self.mqtt_username,
+                                "key"     : self.mqtt_key
+                                }
         self.broker          = 'io.adafruit.com',
         self.port            = '1883'
+        
 
         #oled settings
 
