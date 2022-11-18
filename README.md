@@ -21,13 +21,19 @@
     This requires you are using an ESP32 flashed with adafruit's NINA firmware!!!
     https://github.com/adafruit/nina-fw
         
-    the IOxx numbers indicate which pin you use on the ESP32 module but ONLY if it is NOT an "airlift" module frfom adafruit
+    the IOxx numbers indicate which pin you use on the ESP32 module but ONLY if it is NOT an "airlift" module from adafruit
         
     You can find the corresponding pins by looking at the schematic of the esp32 module itself to figure out what IOxx pin on your 
     chosen esp32 module to use
 
     This code was written with a raspberry pi pico as the main controller so this code uses the Pico class defined above. You can replace that 
     with your own class, defining its own pins
+    
+# unrelated notes on security as public service announcement for the masses
+    
+    Don't just use code people wrote without reading it, look for syscals, network calls, URI's leading to random places owned by china or iran or russia, obfuscated code, muckery with your OS internals... the list goes on and on.
+    Hackers like skids, they are useful idiots, dont be a skid, learn to read the code you use and dont just run any script you find because it sounds like it's what you need.
+    Attacks have been focused more and more frequently on the tooling and background workings of softwares, it's always been a vector but now its almost ubiquitous.
 
 
 
@@ -47,6 +53,17 @@
 
     MQTTManagment()
         put mqtt interactions here
+ 
+
+# >`secrets.py`
+create a file named "secrets.py" and put the following code in it, dont forget to put your information into that file
+
+```python
+adafruit_io_username    = ""
+adafruit_io_api_key     = ""
+ssid                    = ""
+password                = ''
+```
         
 # how to use
 
