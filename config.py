@@ -11,7 +11,7 @@ class Config:
         '''
         waaat
         '''
-        self.debug          =  True
+        self.debug          = True
         self.ssid           = ssid
         self.password       = password
         # the name is important, read the code in:
@@ -21,7 +21,7 @@ class Config:
         # do not change names, these items are for specific activities
         self.mqtt_username   = api_username
         self.mqtt_key        = api_key
-        
+
         # just to make a single entity with both, I know its redundant
         # but it makes it cleaner later
         self.mqtt_auth_creds = {
@@ -37,10 +37,18 @@ class Config:
         #pinout
         # was thinking of moving this here but I might just
         # put "pinout" in its own file or class
+        #
+        # UPDATE: this has been done, this is here for no reason at all
         #self.oled_i2c_sda    = board.GP18 
         #self.oled_i2c_scl    = board.GP19 
         self.HEIGHT          = 128
         self.WIDTH           = 64
         self.BORDER          = 5
         self.oled_i2c_addr   = 0x3c
+
+    def __repr__(self):
+        '''
+        prettify this later on
+        '''
+        [ print(all) for all in self.var()]
         
