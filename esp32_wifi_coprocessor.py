@@ -11,7 +11,8 @@ from config import Config
 from adafruit_esp32spi import adafruit_esp32spi
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 # http / sockets
-from adafruit_requests import adafruit_requests as requests
+#from adafruit_requests import adafruit_requests as requests
+import adafruit_requests as requests
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 ###############################################################################
 # REPRESENTATION OF ESP32 WIFI CO-PROCESSOR
