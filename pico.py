@@ -4,21 +4,18 @@
 ################################
 # Internal
 ################################
-import board
 import busio
-from time import sleep
-from machine import Pin
 from digitalio import DigitalInOut
 
 ################################
 # communications
 ################################
 # spi
-from adafruit_esp32spi import adafruit_esp32spi
-from adafruit_esp32spi import adafruit_esp32spi_wifimanager
+#from adafruit_esp32spi import adafruit_esp32spi
+#from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 # http / sockets
-from adafruit_requests import adafruit_requests as requests
-import adafruit_esp32spi.adafruit_esp32spi_socket as socket
+#import adafruit_requests as requests
+#import adafruit_esp32spi.adafruit_esp32spi_socket as socket
 
 
 ################################
@@ -60,7 +57,14 @@ class Pico:
 ###############################################################################
 # PINOUT
 ###############################################################################   
-    def set_wifi_coprocessor_pins(self):
+    def set_wifi_coprocessor_pins(self,
+                                  wifi_esp32_sck,
+                                  wifi_esp32_miso,
+                                  wifi_esp32_mosi,
+                                  wifi_esp32_cs,
+                                  wifi_esp32_ready,
+                                  wifi_esp32_reset
+                                  ):
         '''
         This pinout requires you are using an ESP32 flashed with adafruit's
 
@@ -82,12 +86,12 @@ class Pico:
         This is done so that I can meta my way out of having the file represent
         the board. Treat the class as a pico kind of
         '''
-        self.wifi_esp32_sck    = board.GP10
-        self.wifi_esp32_miso   = board.GP12
-        self.wifi_esp32_mosi   = board.GP11
-        self.wifi_esp32_cs     = board.GP13
-        self.wifi_esp32_ready  = board.GP14
-        self.wifi_esp32_reset  = board.GP15
+        self.wifi_esp32_sck    = wifi_esp32_sck
+        self.wifi_esp32_miso   = wifi_esp32_miso
+        self.wifi_esp32_mosi   = wifi_esp32_mosi
+        self.wifi_esp32_cs     = wifi_esp32_cs
+        self.wifi_esp32_ready  = wifi_esp32_ready
+        self.wifi_esp32_reset  = wifi_esp32_reset
 
         #----------------------------------------------------------------------
         # POWER             |
@@ -123,8 +127,8 @@ class Pico:
                                         )
         #
         #
-        #------- CS (clock select) ------------*
-        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5)
+        #------- CS (clock select) (SS)------------*
+        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5) (logical pin 29)
         # pico                  = GP13
         self.esp32_cs           = DigitalInOut(self.wifi_esp32_cs)
         #
@@ -137,7 +141,7 @@ class Pico:
         # on other boards, you will need to look at the schematic
         #   
         #------- BUSY ------------
-        # esp32-S_NINA_firmware = IO33 
+        # esp32-S_NINA_firmware = IO33 (LOGICAL PIN 8)
         # pico                  = GP14
         self.esp32_ready    = DigitalInOut(self.wifi_esp32_ready)
 
@@ -163,24 +167,3 @@ class Pico:
                                                     self.esp32_ready, 
                                                     self.esp32_reset
                                                     )
-
-
-###############################################################################
-# old code
-###############################################################################
-
-    #def get_spi_pins(self)->dict :
-    #    '''
-    #    UNFINISHED, possibly unneeded
-    #    returns dict of spi pinout on the pico
-    #
-    #    be sure to label these properly, dont get confused like me
-    #    '''
-        #set_of_things = {
-        #    "wifi_esp32_sck"   :self.wifi_esp32_sck,
-        #    "wifi_esp32_miso"  :self.wifi_esp32_miso,
-        #    "wifi_esp32_mosi"  :self.wifi_esp32_mosi,
-        #    "wifi_esp32_cs"    :self.wifi_esp32_cs,
-        #    "wifi_esp32_ready" :self.wifi_esp32_ready,
-        #}
-        #return set_of_things
