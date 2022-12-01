@@ -1,7 +1,7 @@
 ################################
 # MQTT
 ################################
-from mqtt_manager import MQTTManager
+#from mqtt_manager import MQTTManager
 from adafruit_io.adafruit_io import IO_MQTT
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 
