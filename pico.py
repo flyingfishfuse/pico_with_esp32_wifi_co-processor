@@ -11,7 +11,7 @@ from digitalio import DigitalInOut
 # communications
 ################################
 # spi
-#from adafruit_esp32spi import adafruit_esp32spi
+from adafruit_esp32spi import adafruit_esp32spi
 #from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 # http / sockets
 #import adafruit_requests as requests
@@ -33,8 +33,8 @@ from mqtt_manager import MQTTManager
 class Pico:
     def __init__(self,
                  config:Config,
-                 mqtt_manager:MQTTManager,
-                 screen:SSD1306
+                 #mqtt_manager:MQTTManager,
+                 #screen:SSD1306
                  ):
         '''
         UNFINISHED
@@ -48,10 +48,11 @@ class Pico:
         
             sensor controller  : sensor_esp32_
         '''
+        print("[+] Creating Pico() class")
         self.config             = config
-        self.mqtt_manager       = mqtt_manager
+        #self.mqtt_manager       = mqtt_manager
         # uncomment if using an OLED screen
-        self.screen             = screen
+        #self.screen             = screen
 
         #self.spi_pin_set        = {}
 ###############################################################################
@@ -86,6 +87,7 @@ class Pico:
         This is done so that I can meta my way out of having the file represent
         the board. Treat the class as a pico kind of
         '''
+        print("[+] Setting wifi co-processor pins ")
         self.wifi_esp32_sck    = wifi_esp32_sck
         self.wifi_esp32_miso   = wifi_esp32_miso
         self.wifi_esp32_mosi   = wifi_esp32_mosi
@@ -167,3 +169,19 @@ class Pico:
                                                     self.esp32_ready, 
                                                     self.esp32_reset
                                                     )
+
+    def set_mqtt_manager(self,new_manager):
+        """_summary_
+
+        Args:
+            new_manager (_type_): _description_
+        """
+        self.mqtt_manager = new_manager
+
+    def set_screen(self,new_oled):
+        """_summary_
+
+        Args:
+            new_oled (SSD1306): _description_
+        """
+        self.screen = new_oled
