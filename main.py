@@ -99,6 +99,15 @@ if __name__ == "__main__":
     except Exception as e:
         errorlogger(e, "[-] creation of ESP32 wifi module FAILED!")
 
+
+    try:
+        print("[+] Adding WLAN credentials to esp32 device")
+        esp_device.wlan_authentication()
+    except Exception as e:
+        errorlogger(e, "[+] Failed to add WLAN credentials to device")
+    #######################################
+    # initialize wifi on esp32
+    #######################################
     # init wifi ops on the esp32, feeding the data into the SPI
     # pipeline shared between pico and esp32
     try:
@@ -106,6 +115,15 @@ if __name__ == "__main__":
         esp_device.init_wifi()
     except Exception as e:
         errorlogger(e, "[-] WIFI operation initialization FAILED!")
+    
+    #######################################
+    # connect socket to SPI bus
+    #######################################
+    try:
+        print("[+] connecting SPI bus to socket resource")
+        esp_device.set_socket_to_SPI()
+    except Exception as e:
+        errorlogger(e, "[-] SPI to socket bus initialization FAILED!")
 
 
 ###############################################################################
@@ -120,7 +138,7 @@ if __name__ == "__main__":
         print("[+] connecting to AP")
         esp_device.wifi.connect()
     except Exception as e:
-        traceback.format_exception(None, e, None)
+        print(traceback.format_exception(None, e, None))
         
 
     #######################################
@@ -131,13 +149,15 @@ if __name__ == "__main__":
         esp_device.connect_to_AP(esp_device.secrets)
     except Exception as e:
         errorlogger(e, "[-] Connecting to Access Point FAILED!")
-    
-    ## display IP addr
+
+    #######################################
+    # display IP addr
+    ####################################### 
     try:
         print(f"[+] Device IP {esp_device.ip()}")
         #esp_device.ip()
     except Exception as e:
-        print("[-] Device IP FAILED!")
+        errorlogger(e, "[-] Device IP FAILED!")
 
 ###############################################################################
 # initialization step 3
@@ -164,7 +184,9 @@ if __name__ == "__main__":
     except Exception as e:
         errorlogger(e, "[-] mqtt client init FAILED!")
 
-
+    #######################################
+    # get text from interweb
+    ####################################### 
 
     # test 1
     # retrieve text resource
@@ -173,6 +195,9 @@ if __name__ == "__main__":
     except Exception as e:
         errorlogger(e, "[-] FAILED!")
     
+    #######################################
+    # get JSON off interwebz
+    ####################################### 
     # test 23
     # retrieve JSON resource
     try:
@@ -181,6 +206,9 @@ if __name__ == "__main__":
         print("[-] FAILED!")
 
 
+    #######################################
+    # FULL TEST
+    ####################################### 
     # loop the main operations
         # all you have to do is:
         # config.debug = False
@@ -201,4 +229,4 @@ if __name__ == "__main__":
                 print("[+] ")
                 esp_device.check_wifi_reset_if_bad()
     except Exception as e:
-        print("[-] FAILED!")
+        errorlogger(e, "[-] FAILED!")
