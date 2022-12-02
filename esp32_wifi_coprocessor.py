@@ -53,7 +53,7 @@ class Esp32WifiDevice:
         #self.init_spi()
         #self.init_wifi()
 
-    def authentication(self,secrets:dict):
+    def wlan_authentication(self):#,secrets:dict):
         '''
         WLAN authentication credentials, in most cases you want this in a different
         file so you can exclude any credential leakages when uploading code to a 
@@ -62,12 +62,12 @@ class Esp32WifiDevice:
 
         defaults to my test network credentials if no parameter given
         '''
-        # must try to validate auth creds
-        if secrets is not None and len(secrets) == 2:
-            self.secrets = secrets
+        # must try to validate auth creds better
+        #if len(secrets) == 2:
+        #    self.secrets = secrets
         # defaults to my test network credentials
-        else:
-            self.secrets = {
+        #else:
+        self.secrets = {
                 'ssid' : 'Untrusted Network',
                 'password' : 'Whatapassword1!'
                 }
@@ -85,8 +85,12 @@ class Esp32WifiDevice:
         except Exception as e:
             traceback.format_exception(None, e, None)
             errorlogger(e,"[-] ESP32 init_wifi() failed")
-            
+
+    def set_socket_to_SPI(self):
+        """
+        """   
         # establishes a socket resource to be made available for the esp32 data
+        # connects the spi bus to an AF_xxxx SOCKET
         requests.set_socket(socket, self.spi_bus)
 
     def __ip__(self):
