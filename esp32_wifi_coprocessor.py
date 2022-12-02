@@ -41,6 +41,9 @@ class Esp32WifiDevice:
         self.spi_bus = spi_bus
         # slot to store html from a webrequest
         self.requestedpage = {}
+
+        self.api_uri = "https://io.adafruit.com/api/v2/"
+
         self.ip = self.__ip__()
         #self.init_spi()
         #self.init_wifi()
@@ -194,3 +197,27 @@ class Esp32WifiDevice:
         print(result.json())
         print("-" * 40)
         result.close()
+
+    def send_to_API(self,feed,data):
+        """
+        sends data to adafruit API
+        """
+        try:
+            print("Posting data...", end="")
+            feed = "test"
+            payload = {"value": data}
+            response = self.wifi.post(self.api_uri
+                                    + self.wifi.secrets["adafruit_io_username"]
+                                    + "/feeds/"
+                                    + feed
+                                    + "/data",
+                                    json=payload,
+                                    headers={"X-AIO-KEY": self.wifi.secrets["adafruit_io_api_key"]},
+                                    )
+            print(response.json())
+            response.close()
+            print("OK")
+        except OSError as e:
+            print("Failed to get data, retrying\n", e)
+            self.wifi.reset()
+            response = None
