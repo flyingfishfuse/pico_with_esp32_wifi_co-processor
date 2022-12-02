@@ -3,7 +3,8 @@
 # Internal
 ################################
 from config import Config
-
+from util import errorlogger
+import traceback
 ################################
 # communications
 ################################
@@ -43,6 +44,10 @@ class Esp32WifiDevice:
         self.requestedpage = {}
 
         self.api_uri = "https://io.adafruit.com/api/v2/"
+        
+        self.TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
+        self.JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
+
 
         self.ip = self.__ip__()
         #self.init_spi()
@@ -74,13 +79,15 @@ class Esp32WifiDevice:
         '''
         Initializes esp32 wifi managment
         '''
-        self.wifi     = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(self.spi_bus, self.secrets)
-
+        print("[+] Esp32WifiDevice.init_wifi()")
+        try:
+            self.wifi     = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(self.spi_bus, self.secrets)
+        except Exception as e:
+            traceback.format_exception(None, e, None)
+            errorlogger(e,"[-] ESP32 init_wifi() failed")
+            
         # establishes a socket resource to be made available for the esp32 data
         requests.set_socket(socket, self.spi_bus)
-
-        self.TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
-        self.JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
 
     def __ip__(self):
         '''
