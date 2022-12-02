@@ -127,20 +127,22 @@ if __name__ == "__main__":
         print("[+] Creating Esp32WifiDevice()")
         esp_device = Esp32WifiDevice(esp_spi_bus,new_config)
     except Exception as e:
-        errorlogger(e, "[-] FAILED!")
+        errorlogger(e, "[-] creation of ESP32 wifi module FAILED!")
 
     # establish communications between pico and esp32
-    try:
-        print("[+] Initializing wifi co-processor spi")
-        esp_device.init_spi()
-    except Exception as e:
-        errorlogger(e, "[-] FAILED!")
+    #try:
+    #    print("[+] Initializing wifi co-processor spi")
+    #    esp_device.init_spi()
+    #except Exception as e:
+    #    errorlogger(e, "[-] FAILED!")
 
+    # init wifi ops on the esp32, feeding the data into the SPI
+    # pipeline shared between pico and esp32
     try:
         print("[+] Initializing Wifi Operations")
         esp_device.init_wifi()
     except Exception as e:
-        errorlogger(e, "[-] FAILED!")
+        errorlogger(e, "[-] WIFI operation initialization FAILED!")
 
 # initialization step 2
 # connect to network
