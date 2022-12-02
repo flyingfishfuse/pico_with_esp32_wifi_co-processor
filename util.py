@@ -21,7 +21,7 @@ def errorlogger(exception:Exception, message:str):
     #exc_type, exc_value, exc_tb = sys.exc_info()
     #trace = traceback.TracebackException(exc_type, exc_value, exc_tb)
     print(message)
-    traceback.format_exception(None, exception, None)
+    print(traceback.format_exception(None, exception, None))
     #lineno = 'LINE NUMBER : ' + str(exc_tb.tb_lineno)
     #print(
     #    message+"\n [-] "+lineno+"\n [-] "+''.join(trace.format_exception_only()) +"\n"
