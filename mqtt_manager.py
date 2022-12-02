@@ -2,6 +2,7 @@
 # MQTT
 ################################
 #from mqtt_manager import MQTTManager
+import adafruit_requests as requests
 from adafruit_io.adafruit_io import IO_MQTT
 import adafruit_minimqtt.adafruit_minimqtt as MQTT
 
@@ -21,6 +22,7 @@ class MQTTManager:
 
         It holds the callbacks and the init as well as dial out, dial in
         '''
+        print("[+] Creating new MQTT manager")
         # do nothing, user must call init themself
         self.mqtt_username   = config.mqtt_username
         self.mqtt_passkey    = config.mqtt_key
@@ -32,18 +34,19 @@ class MQTTManager:
         self.set_mqtt_secret(config.mqtt_auth_creds)
 
         # establish an MQTT connection on the pico
-        self.init_mqtt()
+        #self.init_mqtt()
     
         # initialize an mqtt client
-        self.init_mqtt_client()
+        #self.init_mqtt_client()
 ###############################################################################
 # MQTT operations
 ###############################################################################
-    def init_mqtt(self):
+    def init_mqtt(self,esp_spi_bus):
         '''
-        initializes an mqtt socket
+        initializes an mqtt socket, give it the spi_bus from the pico()
         '''
-        MQTT.set_socket(socket, self.esp_spi_bus)
+        print(f"[+] MQTTManager.init_mqtt")
+        MQTT.set_socket(socket, esp_spi_bus)
 
     def set_mqtt_secret(self,mqtt_secret:dict):
         '''
@@ -58,6 +61,7 @@ class MQTTManager:
         BIG TODO: refactor this function, I got brainulated and skipped 
         doing the thing to the thing for the things with the thingamabooble
         '''
+        print(f"[+] MQTTManager.set_mqtt_secret({mqtt_secret})")
         # must try to validate auth creds a little more
         if len(mqtt_secret) == 2 and isinstance(mqtt_secret, dict):
             for each in mqtt_secret:
@@ -81,6 +85,7 @@ class MQTTManager:
         '''
         Initialize a new MQTT Client object
         '''
+        print(f"[+] MQTTManager.init_mqtt_client()")
         self.mqtt_client = MQTT.MQTT(
                                      broker=self.broker,
                                      port=self.port,
@@ -95,6 +100,17 @@ class MQTTManager:
         io.on_disconnect = self.disconnected
         io.on_subscribe = self.subscribe
 
+    def send_sensor_data_to_api(self,dict_of_data:dict):
+        """
+        Sends sensor data to adafruit api with HTTP requests
+         This is a fallback method and should be transitioned from when moving from 
+         dev to production
+        """
+        print(f"[+] MQTTManager.send_sensor_data_to_api({dict_of_data}) ")
+        #TODO: build this out
+        #crafted_request = dict_of_data
+        #requests.post(crafted_request)
+
     def create_feeds(self,new_feeds:dict):
         '''
         Creates endpoints for publishing and subscribing
@@ -105,6 +121,7 @@ class MQTTManager:
         output:
             self.new_endpoint_name_1 = "mqtt_username/feeds/new_endpoint_name_1
         '''
+        print(f"[+] MQTTManager.create_feeds")
         for each in new_feeds:
             # add class member named after feed
             setattr(self,each ,f"{self.mqtt_username}/feeds/{each}")
@@ -118,8 +135,6 @@ class MQTTManager:
         '''
         for feed_item in self.feed_list:
             print(f"[+] Feed entry: {self.feed_list.get(feed_item)}")
-
-
 
     #def init_mqtt(self):
     #    '''
@@ -144,12 +159,12 @@ class MQTTManager:
 
     #def create_callback(self, new_callback:function)-> Callback:
         # Initialize an Adafruit IO MQTT Client
-        io = IO_MQTT(self.mqtt_client)
+        #io = IO_MQTT(self.mqtt_client)
 
         # Connect the callback methods defined above to Adafruit IO
-        io.on_connect = self.connected
-        io.on_disconnect = self.disconnected
-        io.on_subscribe = self.subscribe
+        #io.on_connect = self.connected
+        #io.on_disconnect = self.disconnected
+        #io.on_subscribe = self.subscribe
     # Define callback methods which are called when events occur
     # pylint: disable=unused-argument, redefined-outer-name
     def connected(client, userdata, flags, rc):
