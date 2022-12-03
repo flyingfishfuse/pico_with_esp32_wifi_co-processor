@@ -41,21 +41,18 @@ if __name__ == "__main__":
     #######################################
     # CONFIG
     #######################################
-    #try:
-    #create config for setting auth and endpoints
-    new_config = Config(ssid,password,adafruit_io_username,adafruit_io_api_key)
-    #except Exception as e:
-    #    errorlogger(e, "[-] FAILED!")
+    try:
+        # create config for setting auth and endpoints 
+        new_config = Config(ssid,password,adafruit_io_username,adafruit_io_api_key)
+    except Exception as e:
+        errorlogger(e, "[-] Config init FAILED!")
     
-
-
     #######################################
     # PICO
     #######################################
     # create wrapper/reference for main board
-    # with configuration, mqtt, and screen managers
     try:
-        pico = Pico(new_config)#,new_screen)
+        pico = Pico(new_config)
     except Exception as e:
         errorlogger(e, "[-] Pico module creation FAILED!")
 
@@ -68,8 +65,7 @@ if __name__ == "__main__":
         pico.set_wifi_coprocessor_pins(wifi_esp32_sck,wifi_esp32_miso,wifi_esp32_mosi,
                                       wifi_esp32_cs,wifi_esp32_ready,wifi_esp32_reset)
     except Exception as e:
-        errorlogger(e, "[-] set_wifi_coprocessor_pins FAILED!")
-
+        errorlogger(e, "[-] PICO WIFI PINOUT SETUP FAILED!")
 
     #######################################
     # PICO SPI BUS
@@ -99,7 +95,9 @@ if __name__ == "__main__":
     except Exception as e:
         errorlogger(e, "[-] creation of ESP32 wifi module FAILED!")
 
-
+    #######################################
+    # authentication
+    #######################################
     try:
         print("[+] Adding WLAN credentials to esp32 device")
         esp_device.wlan_authentication()
@@ -177,17 +175,23 @@ if __name__ == "__main__":
     
     # init the internal mqtt connection
     new_mqtt_manager.init_mqtt(esp_spi_bus=esp_spi_bus)
-    
+
+    #######################################
+    # create mqtt client
+    #######################################
     try:
     # initialize an mqtt client
         new_mqtt_manager.init_mqtt_client()
     except Exception as e:
         errorlogger(e, "[-] mqtt client init FAILED!")
 
+
+###############################################################################
+# TESTING
+###############################################################################
     #######################################
     # get text from interweb
     ####################################### 
-
     # test 1
     # retrieve text resource
     try:
