@@ -1,7 +1,14 @@
 import board
 #
 # pico to esp32
-    
+
+######################
+#   UART PINOUT
+#######################
+uart_rx     = board.RX
+usrt_tx     = board.TX
+
+
 ######################
 #   oled pins
 #######################
@@ -16,6 +23,20 @@ oled_reset  = None
 # you need to reference the esp32 module schematic to find these pins
 # if your module differs
 #ESP32SPI/NINA expects ESP32 pins 5,14,18,23,33 ...RX/TX for debug UART, GPIO for bootloading.
+
+    #-----------------------------------------------------------------#
+    # POWER             |                                             #
+    # Vin 3.3v-5v / 250ma required for WiFi use. (Pin Position 40)    #
+    # 3v Out - upto 50ma for other devices (not used)                 #
+    # GND               | Ground (Pin Position 13)                    #
+    #                                                                 #
+    ###-------------------------------------------------------------###
+    #                         SPI PINOUT                              #
+    ###-------------------------------------------------------------###
+    # (there has been a movement to change miso/mosi naming)          #
+    # MISO                  = Peripheral Out Controller In (PoCi)     #
+    # MOSI                  = Peripheral In Controller Out (PiCo)     #
+    #---------------------------------------------------------------###
 #done
 #esp32-S_NINA_firmware = IO14 (hiletgo esp32d gpio14)
 wifi_esp32_mosi        = board.GP11 #pico
