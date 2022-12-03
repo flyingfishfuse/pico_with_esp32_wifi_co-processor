@@ -55,6 +55,7 @@ class Pico:
         #self.screen             = screen
 
         #self.spi_pin_set        = {}
+
 ###############################################################################
 # PINOUT
 ###############################################################################   
@@ -66,8 +67,7 @@ class Pico:
                                   wifi_esp32_ready,
                                   wifi_esp32_reset
                                   ):
-        '''
-        This pinout requires you are using an ESP32 flashed with adafruit's
+        """This pinout requires you are using an ESP32 flashed with adafruit's
 
             NINA firmware!!!
         
@@ -76,7 +76,10 @@ class Pico:
 
         You can find the corresponding pins by looking at the schematic
         of the esp32 module itself to figure out what IOxx pin on your 
-        chosen esp32 module to use
+        chosen esp32 module to use but in general IOxx directly translates
+        to GPIOxx
+
+        ergo, IO05 maps directly to GPIO5 and so on
 
         The ESP32spi has 12 connections. 
 
@@ -85,8 +88,19 @@ class Pico:
         with your own class, defining its own pins
 
         This is done so that I can meta my way out of having the file represent
-        the board. Treat the class as a pico kind of
-        '''
+        the board. Treat this class as a pico, kind of. All operations in
+        main.py/code.py are going to be running on the pico which will function
+        as an "orchestrator"
+
+
+        Args:
+            wifi_esp32_sck (board.GPIO): _description_
+            wifi_esp32_miso (_type_): _description_
+            wifi_esp32_mosi (_type_): _description_
+            wifi_esp32_cs (_type_): _description_
+            wifi_esp32_ready (_type_): _description_
+            wifi_esp32_reset (_type_): _description_
+        """
         print("[+] Setting wifi co-processor pins ")
         self.wifi_esp32_sck    = wifi_esp32_sck
         self.wifi_esp32_miso   = wifi_esp32_miso
@@ -95,61 +109,16 @@ class Pico:
         self.wifi_esp32_ready  = wifi_esp32_ready
         self.wifi_esp32_reset  = wifi_esp32_reset
 
-        #----------------------------------------------------------------------
-        # POWER             |
-        # Vin 3.3v-5v / 250ma required for WiFi use. (Pin Position 40)
-        # 3v Out - upto 50ma for other devices (not used)
-        # GND               | Ground (Pin Position 13)
-        #          
-        ###-----------------------------------------------------###
-        #       SPI PINOUT
-        ###-----------------------------------------------------###
-
-        # (there has been a movement to change miso/mosi naming)
-        # MISO                  = Peripheral Out Controller In (PoCi)
-        # MOSI                  = Peripheral In Controller Out (PiCo)
-        #-------------------------------------------------------###
-        #
-        #------- SCK -------------*
-        # esp32-S_NINA_firmware = IO18 (hiletgo esp32d gpio18)
-        # pico                  = GP10
-        #
-        #------- MOSI (PICO) (TX) ------------*
-        # esp32-S_NINA_firmware = IO23 (hiletgo esp32d gpio23)
-        # pico                  = GP11
-        #
-        #------- MISO (POCI) (RX) ------------*
-        # esp32-S_NINA_firmware = IO14 (hiletgo esp32d gpio14)
-        # pico                  = GP12
-        #
         # this represents the SPI bus connections between esp32 and pico
         self.spi            = busio.SPI(self.wifi_esp32_sck, 
                                         self.wifi_esp32_mosi,
                                         self.wifi_esp32_miso
                                         )
-        #
-        #
-        #------- CS (clock select) (SS)------------*
-        # esp32-S_NINA_firmware = IO5 (hiletgo esp32d GPIO5) (logical pin 29)
-        # pico                  = GP13
+
         self.esp32_cs           = DigitalInOut(self.wifi_esp32_cs)
-        #
-        #================================
-        #   NOTE: in the airlift, BUSY is attached to pin 9 (IO33/A1_5/X32N)
-        #   This means that in other modules, if flashed with NINA firmware
-        #   BUSY will be on IO33
-        #       on hiletgo wroom-esp32S (mislabeled as esp-wroom-32-d)
-        #       this is pin33 in the pinout given by hiletgo, meaning GPIO33
-        # on other boards, you will need to look at the schematic
-        #   
-        #------- BUSY ------------
-        # esp32-S_NINA_firmware = IO33 (LOGICAL PIN 8)
-        # pico                  = GP14
+
         self.esp32_ready    = DigitalInOut(self.wifi_esp32_ready)
 
-        #------- RST ------------ = GP9
-        # esp32-S_NINA_firmware = label:  RESET  | MODULE pin 2
-        #                         IC pin: chp_pu | PHYSICAL pin 3
         self.esp32_reset        = DigitalInOut(self.wifi_esp32_reset)
 
         # GP0               = Not needed - used for Bootloading and Blutooth
@@ -170,18 +139,31 @@ class Pico:
                                                     self.esp32_reset
                                                     )
 
+###############################################################################
+# UART
+###############################################################################
+    def init_uart(self,tx,rx,baudrate=9600):
+        """Initializes UART bus on the pico
+
+        Args:
+            tx (board.TX): Transmit
+            rx (board.RX): Receive
+            baudrate (int, optional): baudrate of UART line. Defaults to 9600.
+        """
+        self.uart = busio.UART(tx, rx, baudrate=baudrate)
+
     def set_mqtt_manager(self,new_manager):
         """_summary_
 
         Args:
-            new_manager (_type_): _description_
+            new_manager (MQTTManager): an instance of MQTTManager class
         """
         self.mqtt_manager = new_manager
 
     def set_screen(self,new_oled):
-        """_summary_
+        """sets screen to use for pico as display
 
         Args:
-            new_oled (SSD1306): _description_
+            new_oled (SSD1306): Instance of SSD1306 class
         """
         self.screen = new_oled
