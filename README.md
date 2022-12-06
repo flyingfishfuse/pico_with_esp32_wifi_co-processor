@@ -1,3 +1,13 @@
+#important news
+
+    This project is probably going to be deprecated, random esp32's flashed with nina firmware fails to communicate over SPI bus 100% of the time, hiletgo shit aside, ALL the esp32 boards I tested with NINA-1.7.4 were unable to communicate over SPI and I could not get them to do anything other than reboot in a loop. the NINA firmware is NOT meant for anything other than airlift boards sold by adafruit and trying to use another board is probably going to fail without modifying the board itself, and using one with the exact esp chip used in the airlift. 
+    
+    if it doesnt, you are extremely lucky and/or better at this than I.
+
+    I am changing the code to utilize the pico W, with built in WIFI.
+    
+    The boards tested were a mislabeled hiletgo brand esp32-d, and sparkfun brand esp32 redboard. I will attempt to use a "weimos" brand, UNO form factor, esp32 dev board before deleting this repo and archiving the code in the new library under "docs/old_code".
+
 # overview
     This is a more robust implementation of the wifi coprocessor setup using 
     a circuitpython enabled microprocessor in combination with an esp32 for WLAN
