@@ -1,26 +1,32 @@
-# SPDX-FileCopyrightText: 2022 Liz Clark for Adafruit Industries
+## SPDX-FileCopyrightText: 2022 Liz Clark for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
 
-
-import ssl
-import machine
-import network
-import ubinascii
-import os, gc
+import traceback
+import ssl, os, time
+import microcontroller
 import adafruit_requests
-from util import errorlogger
 import ipaddress, wifi,socketpool
+from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
+
+def errorlogger(exception:Exception, message:str):
+    """
+    prints line number and traceback
+    TODO: save stack trace to error log
+            only print linenumber and function failure
+    """
+    #exc_type, exc_value, exc_tb = sys.exc_info()
+    #trace = traceback.TracebackException(exc_type, exc_value, exc_tb)
+    print(message)
+    print(traceback.format_exception(None, exception, None))
+    #lineno = 'LINE NUMBER : ' + str(exc_tb.tb_lineno)
+    #print(
+    #    message+"\n [-] "+lineno+"\n [-] "+''.join(trace.format_exception_only()) +"\n"
+    #    )
 
 
-from pico_code import Pico
 
-gc.collect()
-
-print()
-print("Connecting to WiFi")
-
-class WifiBoard(Pico):
+class WifiBoard():
     def __init__(self,ssid:str,passphrase:str) -> None:
         """An implementation of the adafruit pico W
 
@@ -28,12 +34,24 @@ class WifiBoard(Pico):
         to draw that info from .env file
     
         """
+        print("[+] Creating WifiBoard() class")
         self.wlan_ssid = ssid
         self.wlan_pass = passphrase
+        #self.headers = {'Authorization': 'Bearer ' + os.getenv('bearer_token')}
         self.radio     = wifi.radio
-    
-    def connect(self,ssid:str,passphrase:str,use_env:bool=True):
+        
+    def reset(self):
+        """resets pico board
+        """
+        print("Resetting microcontroller in 10 seconds")
+        time.sleep(10)
+        microcontroller.reset()
+
+
+    #def connect(self,ssid:str,passphrase:str,use_env:bool=True):
+    def connect(self,use_env:bool=False):
         """connect to your SSID with given passphrase
+
         use_env defaults to true, taking the information from the environment
         variables specified in the .env file in the root of the project directory
 
@@ -45,17 +63,24 @@ class WifiBoard(Pico):
             passphrase (str): WPA passphrase to use for auth
             use_env (bool, optional): Takes ssid/passphrase from .env file in project root. Defaults to True.
         """
+        print("Connecting to WiFi") 
+
         try:
             if use_env:
+                print("[+] Using environment Variables")
                 self.radio.connect(os.getenv('WIFI_SSID'), os.getenv('WIFI_PASSWORD'))
             #if ssid/pass supplied in function call
-            elif use_env == False and ssid == None and passphrase == None:# and not self.wlan_pass and not self.wlan_ssid:
-                print("[-] No SSID or PASSPHRASE given in WIFIBoard.connect(ssid,passphrase,use_env=False) function call")
-                raise Exception
-            # if class instanced with ssid/pass
-            # will ignore ssid/pass given in function call even if use_env == False
-            elif self.wlan_ssid and self.wlan_pass:
-                self.radio.connect(self.wlan_ssid,self.wlan_pass)
+            elif use_env == False:# and ssid == None and passphrase == None:# and not self.wlan_pass and not self.wlan_ssid:
+                # if class instanced with ssid/pass
+                print("[+] Using loaded credentials")
+                if self.wlan_ssid and self.wlan_pass:
+                    print("[+] Attempting connection")
+                    self.radio.connect(self.wlan_ssid,self.wlan_pass)
+                else:
+                    print("[-] No SSID or PASSPHRASE given in WIFIBoard.connect(ssid,passphrase,use_env=False) function call")
+                    raise Exception
+            else:
+                print("major TODO here, finish catching cases")
             #everything went well
             # yes I am missing some cases, I will maybe add them later if I remember
             print("Connected to WiFi")
@@ -66,101 +91,135 @@ class WifiBoard(Pico):
         """
         creates a socket pool to tx/rx data with
         """
-        self.pool = socketpool.SocketPool(self.radio)
-        return self.pool
+        try:
+            self.pool = socketpool.SocketPool(self.radio)
+            return self.pool
+        except Exception as e:
+            errorlogger(e, f"[-] Failed to create socket pool")
 
-    def session(self):
+    def create_session(self):
         """returns a "session object" you can treat like a "requests" lib object
         e.g requests.get(url)/requests.post(url) will GET/POST
         """
         # they can skip some setup if its not a good flow for them
         if not self.pool:
             errorlogger("[-] Socket pool not yet established, creating (this will be removed in the future... maybe)...")
-            self.pool = socketpool.SocketPool(self.radio)
+            self.create_pool()
         else:
-            self.requests = adafruit_requests.Session(self.pool, ssl.create_default_context())
+            try:
+                self.session = adafruit_requests.Session(self.pool, ssl.create_default_context())
+            except Exception as e:
+                errorlogger(e, f"[-] Failed to create TCP session")
+
+    def get(self, uri:str):
+        """uses self.session for GET to specified URI
+        if WifiBoard.create_session() has not been called yet, this function
+        will create a session  for later usage.
+
+        if this behavior is undesired, use WIFIBoard.uget() for a sessionless GET
+
+        Args:
+            URI (str): URI to request via GET
+        """
+        # if session has not been created yet
+        # create one so user can define flow control as they see fit
+        try:
+            if not self.session:
+                print("[+] Session has not been created yet .. creating (this behavior may be removed or changed in the future)")
+                self.create_session()
+            response =self.session.get(uri)
+            return response
+        except Exception as e:
+            errorlogger(e, f"[-] Failed to perform GET request for {uri}")
+    
+    def uget(self,uri:str):
+        """performs a regular GET with no session 
+
+        Args:
+            uri (str): URI to request via GET
+        """
+        try:
+            response =adafruit_requests.get(uri)
+            return response
+        except Exception as e:
+            errorlogger(e, f"[-] Failed to Perform GET request to {uri}")
+    
+    def connect_AIO(self):
+        """connects to adafruit IO servers
+        """
+        try:
+            self.aio = IO_HTTP(self.aio_username, self.aio_key, self.session)
+            print("connected to io")
+        except Exception as e:
+            errorlogger(e, "[-] Failed to connect to Adafruit IO")
 
     def show_stats(self):
         """
         prints information about the connection and device
         """
-        print("My MAC addr:", [hex(i) for i in self.radio.mac_address])
-        print("My IP address is", self.radio.ipv4_address)
+        try:
+            print("My MAC addr:", [hex(i) for i in self.radio.mac_address])
+            print("My IP address is", self.radio.ipv4_address)
+        except Exception as e:
+            errorlogger(e, "[-] Failed to show information about device")
 
-    def ping(self,ipaddress:ipaddress.IPv4Address)
+    def ping(self,ipaddress:str="8.8.4.4"):#:ipaddress.IPv4Address):
         """Pings a server by IP
-        Returns:
-            IPv4Address: string representing an IPV4 address (e.g. 192.168.0.1)
-        """ 
-        self.radio.ping(ipv4)*1000
+        Args:
+            ipaddress (str): String of IPV4 octets, e.g. 192.168.0.1
+        """
+        try:
+            #ipaddress.ip_address("8.8.4.4")
+            ip = ipaddress.ip_address(ipaddress)
+            self.radio.ping(ip)*1000
+        except Exception as e:
+            errorlogger(e, "[-] Failed to Ping")
 
 
-ssid = os.getenv("WLAN_ssid")
-password = os.getenv("WLAN_password")
+if __name__ == "__main__":
+###############################################################################
+# initialization step 1
+# setup devices
+###############################################################################
+    # pull env vars for operation
+    #ssid = os.getenv("WIFI_SSID")
+    #print("[+] SSID: " + ssid)
+    #password = os.getenv("WIFI_PASSWORD")
+    #print("[+] PASS: " + password)
 
-WifiBoard()
 
-while True:
+    
+    #######################################
+    # PICO
+    #######################################
+    # create wrapper/reference for main board
     try:
-        #  pings openweather
-        response = requests.get(url)
-        #  packs the response into a JSON
-        response_as_json = response.json()
-        print()
-        #  prints the entire JSON
-        print(response_as_json)
-        #  gets location name
-        place = response_as_json['name']
-        #  gets weather type (clouds, sun, etc)
-        weather = response_as_json['weather'][0]['main']
-        #  gets humidity %
-        humidity = response_as_json['main']['humidity']
-        #  gets air pressure in hPa
-        pressure = response_as_json['main']['pressure']
-        #  gets temp in kelvin
-        temperature = response_as_json['main']['temp']
-        #  converts temp from kelvin to F
-        converted_temp = (temperature - 273.15) * 9/5 + 32
-        #  converts temp from kelvin to C
-        #  converted_temp = temperature - 273.15
-
-        #  prints out weather data formatted nicely as pulled from JSON
-        print()
-        print("The current weather in %s is:" % place)
-        print(weather)
-        print("%s°F" % converted_temp)
-        print("%s%% Humidity" % humidity)
-        print("%s hPa" % pressure)
-        #  delay for 5 minutes
-        time.sleep(300)
-    # pylint: disable=broad-except
+        #pico = WifiBoard()
+        pico = WifiBoard(ssid="Untrusted Network", passphrase="Whatapassword1!")
+        print(pico.wlan_ssid)
+        print(pico.wlan_pass)
+        pico.connect(use_env=False)
     except Exception as e:
-        print("Error:\n", str(e))
-        print("Resetting microcontroller in 10 seconds")
-        time.sleep(10)
-        microcontroller.reset()
-#  pings Google
-ipv4 = ipaddress.ip_address("8.8.4.4")
-print("Ping google.com: %f ms" % ())
-
-# this is the raspberry pi pico
-mqtt_server = os.getenv("mqtt_server")
+        print("\n[-] Pico module creation FAILED!")
+        #errorlogger(e, "\n[-] Pico module creation FAILED!")
 
 
-client_id = ubinascii.hexlify(machine.unique_id())
+    #######################################
+    # WIFI
+    #######################################
+    try:
+        print("[+] Connecting to WLAN")
+        pico.connect(use_env=False)
+    except Exception as e:
+        print("[-] Wlan connection FAILED!")
+        #errorlogger(e, "[-] Wlan connection FAILED!")
 
-topic_pub_temp = b'esp/dht/temperature'
-topic_pub_hum = b'esp/dht/humidity'
-
-last_message = 0
-message_interval = 5
-
-station = network.WLAN(network.STA_IF)
-
-station.active(True)
-station.connect(ssid, password)
-
-while station.isconnected() == False:
-  pass
-
-print('Connection successful')
+    #######################################
+    # Session
+    #######################################
+    try:
+        print("[+] Creating a session object without URI")
+        pico.create_session()
+    except Exception as e:
+        print("[+] Failed to create TCP session object")
+        #errorlogger(e, "[+] Failed to create TCP session object")
