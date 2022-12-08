@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+# extra license, GPLv3, under ME. I wrote this.
+from secrets import adafruit_io_username, adafruit_io_api_key, ssid, password
 import traceback
 import ssl, os, time
 import microcontroller
@@ -144,6 +146,35 @@ class WifiBoard():
         except Exception as e:
             errorlogger(e, f"[-] Failed to Perform GET request to {uri}")
     
+    def scan(self,start_chan:int,stop_chan:int):
+        """scans for AP's in range
+
+        Args:
+            start_chan (int): channel to begin scanning on
+            stop_chan (int): channel to end scanning on
+        """
+        print("[+] Beginning Scanning")
+        counter = 1
+        self.scan_results = {}
+        for network in self.radio.start_scanning_networks():
+            print(network.ssid)
+            self.scan_results.update(
+                {
+                    counter:{
+                    "ssid" : network.ssid,
+                    "bssid": network.bssid,
+                    "rssi" : network.rssi,
+                    "chan" : network.ssid
+                    }
+                }
+            )
+            counter + 1
+    
+    def show_scan_results(self):
+        """prints results from scan()"""
+        for network in self.scan_results:
+            print(network)
+
     def connect_AIO(self):
         """connects to adafruit IO servers
         """
@@ -195,12 +226,13 @@ if __name__ == "__main__":
     # create wrapper/reference for main board
     try:
         #pico = WifiBoard()
-        pico = WifiBoard(ssid="Untrusted Network", passphrase="Whatapassword1!")
-        print(pico.wlan_ssid)
-        print(pico.wlan_pass)
-        pico.connect(use_env=False)
+        pico = WifiBoard(ssid=ssid, passphrase=password)
+        #print(pico.wlan_ssid)
+        #print(pico.wlan_pass)
+        #pico.connect(use_env=False)
+
     except Exception as e:
-        print("\n[-] Pico module creation FAILED!")
+        errorlogger(e, "[-] Pico module creation FAILED!")
         #errorlogger(e, "\n[-] Pico module creation FAILED!")
 
 
@@ -211,8 +243,7 @@ if __name__ == "__main__":
         print("[+] Connecting to WLAN")
         pico.connect(use_env=False)
     except Exception as e:
-        print("[-] Wlan connection FAILED!")
-        #errorlogger(e, "[-] Wlan connection FAILED!")
+        errorlogger(e, "[-] Wlan connection FAILED!")
 
     #######################################
     # Session
@@ -221,5 +252,14 @@ if __name__ == "__main__":
         print("[+] Creating a session object without URI")
         pico.create_session()
     except Exception as e:
-        print("[+] Failed to create TCP session object")
-        #errorlogger(e, "[+] Failed to create TCP session object")
+        errorlogger(e, "[+] Failed to create TCP session object")
+
+    #######################################
+    # Scanning
+    #######################################
+    try:
+        print("[+] Scanning for networks")
+        pico.scan() 
+        pico.show_scan_results()
+    except Exception as e:
+        errorlogger(e, "[-] Network scanning failed!")
